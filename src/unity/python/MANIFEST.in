@@ -1,0 +1,6 @@
+include *.txt
+recursive-include graphlab *.so unity_server pylambda_worker *to*pickle graphlab-create-spark-integration.jar
+recursive-include graphlab/canvas *.html *.css *.js *.ico *.otf *.eot *.svg *.ttf *.woff *LICENSE* *.png
+recursive-include graphlab/deploy *.jar
+recursive-include graphlab/lua/pl *.lua
+recursive-include graphlab/toolkits/deeplearning *.conf

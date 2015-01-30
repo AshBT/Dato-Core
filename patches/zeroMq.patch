@@ -1,0 +1,11 @@
+--- configure.ac    2013-10-08 18:03:22.000000000 +0200
++++ configure.ac.new    2013-11-24 19:58:57.000000000 +0100
+@@ -257,7 +257,7 @@
+ # Checks for libraries
+ AC_CHECK_LIB([pthread], [pthread_create])
+ AC_CHECK_LIB([rt], [clock_gettime])
+-AC_CHECK_LIB([sodium], [sodium_init],,AC_MSG_WARN(libsodium is needed for CURVE security))
++AC_CHECK_LIB([sodium], [sodium_init],[libzmq_pedantic="no"],AC_MSG_WARN(libsodium is needed for CURVE security))
+
+ #
+ # Check if the compiler supports -fvisibility=hidden flag. MinGW32 uses __declspec

@@ -1,0 +1,12 @@
+diff --git a/src/static_vars.cc b/src/static_vars.cc
+index 013027d..81e8a79 100644
+--- a/src/static_vars.cc
++++ b/src/static_vars.cc
+@@ -32,6 +32,7 @@
+ // Author: Ken Ashcraft <opensource@google.com>
+ 
+ #include "static_vars.h"
++#include <pthread.h>                    // for pthread_atfork
+ #include <stddef.h>                     // for NULL
+ #include <new>                          // for operator new
+ #include "internal_logging.h"  // for CHECK_CONDITION

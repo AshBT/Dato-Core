@@ -1,0 +1,51 @@
+from .cy_flexible_type cimport flexible_type
+from .cy_flexible_type cimport flex_type_enum 
+from .cy_flexible_type cimport glvec_from_iterable
+from .cy_flexible_type cimport pylist_from_glvec 
+from .cy_type_utils cimport pytype_from_dtype
+from .cy_type_utils cimport pytype_to_flex_type_enum, pytype_from_flex_type_enum
+from .cy_type_utils import infer_type_of_list
+
+HAS_PANDAS = False
+try:
+    import pandas as pd
+    HAS_PANDAS = True 
+except:
+    HAS_PANDAS = False
+
+
+cdef bint is_pandas_dataframe(object v):
+    if HAS_PANDAS:
+        return isinstance(v, pd.core.frame.DataFrame)
+    else:
+        return False
+
+cdef gl_dataframe gl_dataframe_from_pd(object df) except *:
+    cdef gl_dataframe ret
+    assert is_pandas_dataframe(df), 'Cannot convert object of type %s to gl_dataframe' % str(type(df))
+    if len(set(df.columns.values)) != len(df.columns.values):
+        raise ValueError('Input pandas dataframe column names must be unique')
+    for colname in df.columns.values:
+        _type = pytype_from_dtype(df[colname].dtype) # convert from dtype to python type
+        if _type is object:
+            _type = infer_type_of_list(df[colname].values)
+        ret.names.push_back(str(colname))
+        ret.types[str(colname)] = pytype_to_flex_type_enum(_type)
+        ret.values[str(colname)] = glvec_from_iterable(df[colname].values, _type)
+    return ret
+
+cdef pd_from_gl_dataframe(gl_dataframe& df):
+    assert HAS_PANDAS, 'Cannot find pandas library'
+    ret = pd.DataFrame()
+    for _name in df.names:
+        _type = pytype_from_flex_type_enum(df.types[_name])
+        ret[_name] = pylist_from_glvec(df.values[_name])
+        if len(ret[_name]) == 0:
+            """ special handling of empty list, we need to force the type information """
+            ret[_name] = ret[_name].astype(_type)
+    return ret 
+
+
+### Test Util: convert dataframe to gl_dataframe and back ###
+def _dataframe(object df):
+    return pd_from_gl_dataframe(gl_dataframe_from_pd(df))

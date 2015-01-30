@@ -1,0 +1,64 @@
+--- avro-cpp/build.sh	2014-01-10 13:04:02.000000000 -0800
++++ avrocpp2/build.sh	2014-06-26 14:58:52.753080189 -0700
+@@ -22,11 +22,6 @@
+   exit 1
+ }
+ 
+-if [ $# -eq 0 ]
+-then
+-  usage
+-fi
+-
+ if [ -f VERSION.txt ]
+ then
+ VERSION=`cat VERSION.txt`
+@@ -45,8 +40,7 @@
+ TARFILE=../dist/cpp/$AVRO_CPP.tar.gz 
+ 
+ (mkdir -p build; cd build; cmake -G "Unix Makefiles" ..)
+-for target in "$@"
+-do
++target=$1
+ 
+ function do_doc() {
+     doxygen
+@@ -65,7 +59,13 @@
+         COPYING impl jsonschemas NEWS parser README scripts test examples \
+         $BUILD_CPP
+     find $BUILD_CPP -name '.svn' | xargs rm -rf
++    if [ -f VERSION.txt ]
++    then
++    cp VERSION.txt $BUILD_CPP
++    else
+     cp ../../share/VERSION.txt $BUILD_CPP
++    fi
++
+     mkdir -p $DIST_DIR
+     (cd $BUILD_DIR; tar cvzf $TARFILE $AVRO_CPP && cp $TARFILE $AVRO_CPP )
+     if [ ! -f $DIST_FILE ]
+@@ -76,7 +76,7 @@
+ 
+ case "$target" in
+     test)
+-    (cd build && make && cd .. \
++    (cd build && make -j4 && cd .. \
+         && ./build/buffertest \
+         && ./build/unittest \
+         && ./build/testgentest \
+@@ -97,13 +97,12 @@
+ 	;;
+ 
+     install)
+-    (cd build && make install)
++    (cd build && make -j4 && make install)
+     ;;
+ 
+     *)
+-        usage
++    (cd build && make -j4)
++    ;;
+ esac
+ 
+-done
+-
+ exit 0

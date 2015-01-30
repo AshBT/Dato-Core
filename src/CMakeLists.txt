@@ -1,0 +1,35 @@
+project(GraphLab)
+
+# subdirs must be in dependency order
+subdirs(
+  util
+  logger
+  fileio
+  serialization
+  zookeeper_util
+  flexible_type
+  globals
+  fault
+  random
+  timer
+  rpc
+  cppipc
+  perf
+  metric
+  lz4
+  sketches
+  parallel
+  fiber
+  product_key 
+  ini
+  sframe
+  sgraph
+  luastate
+  lambda
+  graph
+  lazy_eval
+  graphlab
+  unity
+  image
+  table_printer
+  )
