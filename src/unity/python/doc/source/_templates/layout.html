@@ -1,0 +1,64 @@
+{% if standalone %}
+  {# use the sphinx default theme #}
+  {% extends "!layout.html" %}
+{% else %}
+  {# completely override the theme, sine we are not extending from it,
+     and output some more Jinja2 template stuff to produce a template #}
+  {{ '{% extends "2col.jinja2" %}' }}
+{% endif %}
+
+{% if not(standalone) %}
+  {{ '{% block title %}' }}
+    {{ '{% raw %}' }}
+      {{ title|striptags|e }}{{ titlesuffix }}
+    {{ '{% endraw %}' }}
+  {{ '{% endblock %}' }}
+
+  {{ '{% block javascript %}' }}
+    {# mathjax #}
+    <script src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+    {{ '{{ super() }}' }}
+
+    {# highlight.js #}
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.0/highlight.min.js"></script>
+    <script type="text/javascript">hljs.initHighlightingOnLoad();</script>
+
+    <script type="text/javascript">
+      {# affix #}
+      require(['bootstrap'], function(bootstrap) {
+        $(function() {
+          $('.gl-docnav').affix({
+            offset: {
+              top: function() {
+                return (this.top = $('.cml-colorbar-top').outerHeight(true) + $('.cml-navbar').outerHeight(true));
+              },
+              bottom: function () {
+                return (this.bottom = $('.footer').outerHeight(true));
+              }
+            }
+          });
+        });
+      });
+    </script>
+  {{ '{% endblock %}' }}
+
+  {{ '{% block css %}' }}
+    {{ '{{ super() }}' }}
+    <link href="/styles/graphlab.hl.light.css" rel="stylesheet" />
+  {{ '{% endblock %}' }}
+
+  {{ '{% block gl_main %}' }}
+    {{ '{% raw %}' }}
+      {% block body %}{% endblock %}
+    {{ '{% endraw %}' }}
+  {{ '{% endblock %}' }}
+
+  {{ '{% block gl_right_bar %}' }}
+    <div class="gl-docnav">
+      {{ '{% raw %}' }}
+        {{ toctree(maxdepth=3, collapse=True, includehidden=True) }}
+      {{ '{% endraw %}' }}
+    </div>
+  {{ '{% endblock %}' }}
+{% endif %}

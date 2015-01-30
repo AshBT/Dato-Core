@@ -1,0 +1,11 @@
+--- libsodium/src/libsodium/include/sodium/crypto_generichash_blake2b.h	2013-09-09 22:44:06.000000000 -0700
++++ libsodium2/src/libsodium/include/sodium/crypto_generichash_blake2b.h	2014-04-03 15:38:33.872580880 -0700
+@@ -26,7 +26,7 @@
+ #endif
+ 
+ #pragma pack(push, 1)
+-CRYPTO_ALIGN(64) typedef struct crypto_generichash_blake2b_state {
++typedef struct CRYPTO_ALIGN(64) crypto_generichash_blake2b_state {
+     uint64_t h[8];
+     uint64_t t[2];
+     uint64_t f[2];

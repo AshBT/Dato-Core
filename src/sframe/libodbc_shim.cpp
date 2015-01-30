@@ -1,0 +1,320 @@
+/*
+* Copyright (C) 2015 Dato, Inc.
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU Affero General Public License as
+* published by the Free Software Foundation, either version 3 of the
+* License, or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU Affero General Public License for more details.
+*
+* You should have received a copy of the GNU Affero General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+#include <sframe/sframe_constants.hpp>
+#include <logger/logger.hpp>
+#include <dlfcn.h>
+#include <cstring>
+
+#include <sql.h>
+#include <sqlext.h>
+
+extern "C" {
+  static void* libodbc_handle = NULL;
+  bool odbc_dlopen_fail = false;
+
+#if (ODBCVER >= 0x0300)
+  static SQLRETURN  SQL_API (*ptr_SQLGetDiagRec)(SQLSMALLINT HandleType, SQLHANDLE Handle,
+                                   SQLSMALLINT RecNumber, SQLCHAR *Sqlstate,
+                                   SQLINTEGER *NativeError, SQLCHAR *MessageText,
+                                   SQLSMALLINT BufferLength, SQLSMALLINT *TextLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLFreeHandle)(SQLSMALLINT HandleType, SQLHANDLE Handle) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLAllocHandle)(SQLSMALLINT HandleType,
+                                    SQLHANDLE InputHandle, SQLHANDLE *OutputHandle) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLSetEnvAttr)(SQLHENV EnvironmentHandle,
+                                   SQLINTEGER Attribute, SQLPOINTER Value,
+                                   SQLINTEGER StringLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLGetTypeInfo)(SQLHSTMT StatementHandle,
+                                    SQLSMALLINT DataType) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLCloseCursor)(SQLHSTMT StatementHandle) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLSetConnectAttr)(SQLHDBC ConnectionHandle,
+                                       SQLINTEGER Attribute, SQLPOINTER Value,
+                                       SQLINTEGER StringLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLGetStmtAttr)(SQLHSTMT StatementHandle,
+                                    SQLINTEGER Attribute, SQLPOINTER Value,
+                                    SQLINTEGER BufferLength, SQLINTEGER *StringLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLSetStmtAttr)(SQLHSTMT StatementHandle,
+                                    SQLINTEGER Attribute, SQLPOINTER Value,
+                                    SQLINTEGER StringLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLEndTran)(SQLSMALLINT HandleType, SQLHANDLE Handle,
+                                SQLSMALLINT CompletionType) = NULL;
+#endif
+  static SQLRETURN  SQL_API (*ptr_SQLDisconnect)(SQLHDBC ConnectionHandle) = NULL;
+  static SQLRETURN SQL_API (*ptr_SQLDriverConnect)(
+      SQLHDBC            hdbc,
+      SQLHWND            hwnd,
+      SQLCHAR 		  *szConnStrIn,
+      SQLSMALLINT        cbConnStrIn,
+      SQLCHAR           *szConnStrOut,
+      SQLSMALLINT        cbConnStrOutMax,
+      SQLSMALLINT 	  *pcbConnStrOut,
+      SQLUSMALLINT       fDriverCompletion) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLExecDirect)(SQLHSTMT StatementHandle,
+                                   SQLCHAR *StatementText, SQLINTEGER TextLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLNumResultCols)(SQLHSTMT StatementHandle,
+                                      SQLSMALLINT *ColumnCount) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLDescribeCol)(SQLHSTMT StatementHandle,
+                                    SQLUSMALLINT ColumnNumber, SQLCHAR *ColumnName,
+                                    SQLSMALLINT BufferLength, SQLSMALLINT *NameLength,
+                                    SQLSMALLINT *DataType, SQLULEN *ColumnSize,
+                                    SQLSMALLINT *DecimalDigits, SQLSMALLINT *Nullable) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLFetch)(SQLHSTMT StatementHandle) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLGetData)(SQLHSTMT StatementHandle,
+                                SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType,
+                                SQLPOINTER TargetValue, SQLLEN BufferLength,
+                                SQLLEN *StrLen_or_Ind) = NULL;
+  static SQLRETURN   SQL_API (*ptr_SQLTables)(SQLHSTMT StatementHandle,
+                                SQLCHAR *CatalogName, SQLSMALLINT NameLength1,
+                                SQLCHAR *SchemaName, SQLSMALLINT NameLength2,
+                                SQLCHAR *TableName, SQLSMALLINT NameLength3,
+                                SQLCHAR *TableType, SQLSMALLINT NameLength4) = NULL;
+  static SQLRETURN SQL_API (*ptr_SQLBindParameter)(
+      SQLHSTMT           hstmt,
+      SQLUSMALLINT       ipar,
+      SQLSMALLINT        fParamType,
+      SQLSMALLINT        fCType,
+      SQLSMALLINT        fSqlType,
+      SQLULEN            cbColDef,
+      SQLSMALLINT        ibScale,
+      SQLPOINTER         rgbValue,
+      SQLLEN             cbValueMax,
+      SQLLEN 		      *pcbValue) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLPrepare)(SQLHSTMT StatementHandle,
+      SQLCHAR *StatementText, SQLINTEGER TextLength) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLExecute)(SQLHSTMT StatementHandle) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLBindCol)(SQLHSTMT StatementHandle,
+                                SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType,
+                                SQLPOINTER TargetValue, SQLLEN BufferLength,
+                                SQLLEN *StrLen_or_Ind) = NULL;
+  static SQLRETURN  SQL_API (*ptr_SQLGetInfo)(SQLHDBC ConnectionHandle,
+                                SQLUSMALLINT InfoType, SQLPOINTER InfoValue,
+                                SQLSMALLINT BufferLength, SQLSMALLINT *StringLength) = NULL;
+
+  static void connect_odbc_shim() {
+    static bool shim_attempted = false;
+    if (shim_attempted == false) {
+      shim_attempted = true;
+      if (libodbc_handle == NULL && (graphlab::LIBODBC_PREFIX.size() > 0)) {
+        std::string user_path = graphlab::LIBODBC_PREFIX + "/libodbc.so";
+        logstream(LOG_INFO) << "Trying " << user_path << std::endl;
+        libodbc_handle = dlopen(user_path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      }
+      if (libodbc_handle == NULL && (graphlab::LIBODBC_PREFIX.size() > 0)) {
+        std::string user_path = graphlab::LIBODBC_PREFIX + "/libodbc.dylib";
+        logstream(LOG_INFO) << "Trying " << user_path << std::endl;
+        libodbc_handle = dlopen(user_path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      }
+      if (libodbc_handle == NULL) {
+        // find a global libodbc.so
+        logstream(LOG_INFO) << "Trying global libodbc.so" << std::endl;
+        libodbc_handle = dlopen("libodbc.so", RTLD_NOW | RTLD_LOCAL);
+      }
+      if (libodbc_handle == NULL) {
+        // find a global libodbc.dylib
+        logstream(LOG_INFO) << "Trying global libodbc.dylib" << std::endl;
+        libodbc_handle = dlopen("libodbc.dylib", RTLD_NOW | RTLD_LOCAL);
+      }
+      if (libodbc_handle == NULL) {
+        logstream(LOG_INFO) << "Unable to load libodbc.{so,dylib}" << std::endl;
+        odbc_dlopen_fail = true;
+      }
+    }
+  }
+
+  static void* get_symbol(const char* symbol) {
+    connect_odbc_shim();
+    if (odbc_dlopen_fail || libodbc_handle == NULL) return NULL;
+    return dlsym(libodbc_handle, symbol);
+  }
+
+  SQLRETURN  SQL_API SQLGetDiagRec(SQLSMALLINT HandleType, SQLHANDLE Handle,
+                                   SQLSMALLINT RecNumber, SQLCHAR *Sqlstate,
+                                   SQLINTEGER *NativeError, SQLCHAR *MessageText,
+                                   SQLSMALLINT BufferLength, SQLSMALLINT *TextLength) {
+    if (!ptr_SQLGetDiagRec) *(void**)(&ptr_SQLGetDiagRec) = get_symbol("SQLGetDiagRec");
+    if (ptr_SQLGetDiagRec)
+      return ptr_SQLGetDiagRec(HandleType,Handle,RecNumber,Sqlstate,NativeError,MessageText,BufferLength,TextLength);
+    else {
+      return SQL_ERROR;
+    }
+  }
+  SQLRETURN  SQL_API SQLFreeHandle(SQLSMALLINT HandleType, SQLHANDLE Handle) {
+    if (!ptr_SQLFreeHandle) *(void**)(&ptr_SQLFreeHandle) = get_symbol("SQLFreeHandle");
+    if (ptr_SQLFreeHandle) return ptr_SQLFreeHandle(HandleType, Handle);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLAllocHandle(SQLSMALLINT HandleType,
+                                    SQLHANDLE InputHandle, SQLHANDLE *OutputHandle) {
+    if (!ptr_SQLAllocHandle) *(void**)(&ptr_SQLAllocHandle) = get_symbol("SQLAllocHandle");
+    if (ptr_SQLAllocHandle) return ptr_SQLAllocHandle(HandleType,
+                                    InputHandle, OutputHandle);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLSetEnvAttr(SQLHENV EnvironmentHandle,
+                                   SQLINTEGER Attribute, SQLPOINTER Value,
+                                   SQLINTEGER StringLength) {
+    if (!ptr_SQLSetEnvAttr) *(void**)(&ptr_SQLSetEnvAttr) = get_symbol("SQLSetEnvAttr");
+    if (ptr_SQLSetEnvAttr) return ptr_SQLSetEnvAttr(EnvironmentHandle,
+                                   Attribute, Value,
+                                   StringLength);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLGetTypeInfo(SQLHSTMT StatementHandle,
+                                    SQLSMALLINT DataType) {
+    if (!ptr_SQLGetTypeInfo) *(void**)(&ptr_SQLGetTypeInfo) = get_symbol("SQLGetTypeInfo");
+    if (ptr_SQLGetTypeInfo) return ptr_SQLGetTypeInfo(StatementHandle,DataType);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLCloseCursor(SQLHSTMT StatementHandle) {
+    if (!ptr_SQLCloseCursor) *(void**)(&ptr_SQLCloseCursor) = get_symbol("SQLCloseCursor");
+    if (ptr_SQLCloseCursor) return ptr_SQLCloseCursor(StatementHandle);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLSetConnectAttr(SQLHDBC ConnectionHandle,
+                                       SQLINTEGER Attribute, SQLPOINTER Value,
+                                       SQLINTEGER StringLength) {
+    if (!ptr_SQLSetConnectAttr) *(void**)(&ptr_SQLSetConnectAttr) = get_symbol("SQLSetConnectAttr");
+    if (ptr_SQLSetConnectAttr) return ptr_SQLSetConnectAttr(ConnectionHandle, Attribute,Value, StringLength);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLGetStmtAttr(SQLHSTMT StatementHandle,
+                                    SQLINTEGER Attribute, SQLPOINTER Value,
+                                    SQLINTEGER BufferLength, SQLINTEGER *StringLength) {
+    if (!ptr_SQLGetStmtAttr) *(void**)(&ptr_SQLGetStmtAttr) = get_symbol("SQLGetStmtAttr");
+    if (ptr_SQLGetStmtAttr) return ptr_SQLGetStmtAttr(StatementHandle, Attribute, Value, BufferLength, StringLength);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLSetStmtAttr(SQLHSTMT StatementHandle,
+                                    SQLINTEGER Attribute, SQLPOINTER Value,
+                                    SQLINTEGER StringLength) {
+    if (!ptr_SQLSetStmtAttr) *(void**)(&ptr_SQLSetStmtAttr) = get_symbol("SQLSetStmtAttr");
+    if (ptr_SQLSetStmtAttr) return ptr_SQLSetStmtAttr(StatementHandle, Attribute, Value, StringLength);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLEndTran(SQLSMALLINT HandleType, SQLHANDLE Handle,
+                                SQLSMALLINT CompletionType) {
+    if (!ptr_SQLEndTran) *(void**)(&ptr_SQLEndTran) = get_symbol("SQLEndTran");
+    if (ptr_SQLEndTran) return ptr_SQLEndTran(HandleType, Handle, CompletionType);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLDisconnect(SQLHDBC ConnectionHandle) {
+    if (!ptr_SQLDisconnect) *(void**)(&ptr_SQLDisconnect) = get_symbol("SQLDisconnect");
+    if (ptr_SQLDisconnect) return ptr_SQLDisconnect(ConnectionHandle);
+    else return SQL_ERROR;
+  }
+  SQLRETURN SQL_API SQLDriverConnect(
+      SQLHDBC            hdbc,
+      SQLHWND            hwnd,
+      SQLCHAR 		  *szConnStrIn,
+      SQLSMALLINT        cbConnStrIn,
+      SQLCHAR           *szConnStrOut,
+      SQLSMALLINT        cbConnStrOutMax,
+      SQLSMALLINT 	  *pcbConnStrOut,
+      SQLUSMALLINT       fDriverCompletion) {
+    if (!ptr_SQLDriverConnect) *(void**)(&ptr_SQLDriverConnect) = get_symbol("SQLDriverConnect");
+    if (ptr_SQLDriverConnect) return ptr_SQLDriverConnect(hdbc,hwnd,szConnStrIn,cbConnStrIn,szConnStrOut,cbConnStrOutMax,pcbConnStrOut,fDriverCompletion);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLExecDirect(SQLHSTMT StatementHandle,
+                                   SQLCHAR *StatementText, SQLINTEGER TextLength) {
+    if (!ptr_SQLExecDirect) *(void**)(&ptr_SQLExecDirect) = get_symbol("SQLExecDirect");
+    if (ptr_SQLExecDirect) return ptr_SQLExecDirect(StatementHandle, StatementText, TextLength);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLNumResultCols(SQLHSTMT StatementHandle,
+                                      SQLSMALLINT *ColumnCount) {
+    if (!ptr_SQLNumResultCols) *(void**)(&ptr_SQLNumResultCols) = get_symbol("SQLNumResultCols");
+    if (ptr_SQLNumResultCols) return ptr_SQLNumResultCols(StatementHandle,ColumnCount);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLDescribeCol(SQLHSTMT StatementHandle,
+                                    SQLUSMALLINT ColumnNumber, SQLCHAR *ColumnName,
+                                    SQLSMALLINT BufferLength, SQLSMALLINT *NameLength,
+                                    SQLSMALLINT *DataType, SQLULEN *ColumnSize,
+                                    SQLSMALLINT *DecimalDigits, SQLSMALLINT *Nullable) {
+    if (!ptr_SQLDescribeCol) *(void**)(&ptr_SQLDescribeCol) = get_symbol("SQLDescribeCol");
+    if (ptr_SQLDescribeCol) return ptr_SQLDescribeCol(StatementHandle,ColumnNumber,ColumnName,BufferLength,NameLength,DataType,ColumnSize,DecimalDigits,Nullable);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLFetch(SQLHSTMT StatementHandle) {
+    if (!ptr_SQLFetch) *(void**)(&ptr_SQLFetch) = get_symbol("SQLFetch");
+    if (ptr_SQLFetch) return ptr_SQLFetch(StatementHandle);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLGetData(SQLHSTMT StatementHandle,
+                                SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType,
+                                SQLPOINTER TargetValue, SQLLEN BufferLength,
+                                SQLLEN *StrLen_or_Ind) {
+    if (!ptr_SQLGetData) *(void**)(&ptr_SQLGetData) = get_symbol("SQLGetData");
+    if (ptr_SQLGetData) return ptr_SQLGetData(StatementHandle,ColumnNumber,TargetType,TargetValue,BufferLength,StrLen_or_Ind);
+    else return SQL_ERROR;
+  }
+  SQLRETURN   SQL_API SQLTables(SQLHSTMT StatementHandle,
+                                SQLCHAR *CatalogName, SQLSMALLINT NameLength1,
+                                SQLCHAR *SchemaName, SQLSMALLINT NameLength2,
+                                SQLCHAR *TableName, SQLSMALLINT NameLength3,
+                                SQLCHAR *TableType, SQLSMALLINT NameLength4) {
+    if (!ptr_SQLTables) *(void**)(&ptr_SQLTables) = get_symbol("SQLTables");
+    if (ptr_SQLTables) return ptr_SQLTables(StatementHandle,CatalogName,NameLength1,SchemaName,NameLength2,TableName,NameLength3,TableType,NameLength4);
+    else return SQL_ERROR;
+  }
+  SQLRETURN SQL_API SQLBindParameter(
+      SQLHSTMT           hstmt,
+      SQLUSMALLINT       ipar,
+      SQLSMALLINT        fParamType,
+      SQLSMALLINT        fCType,
+      SQLSMALLINT        fSqlType,
+      SQLULEN            cbColDef,
+      SQLSMALLINT        ibScale,
+      SQLPOINTER         rgbValue,
+      SQLLEN             cbValueMax,
+      SQLLEN 		         *pcbValue) {
+    if (!ptr_SQLBindParameter) *(void**)(&ptr_SQLBindParameter) = get_symbol("SQLBindParameter");
+    if (ptr_SQLBindParameter) return ptr_SQLBindParameter(hstmt,ipar,fParamType,fCType,fSqlType,cbColDef,ibScale,rgbValue,cbValueMax,pcbValue);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLPrepare(SQLHSTMT StatementHandle,
+      SQLCHAR *StatementText, SQLINTEGER TextLength) {
+    if (!ptr_SQLPrepare) *(void**)(&ptr_SQLPrepare) = get_symbol("SQLPrepare");
+    if (ptr_SQLPrepare) return ptr_SQLPrepare(StatementHandle,StatementText,TextLength);
+    else return SQL_ERROR;
+  }
+  SQLRETURN  SQL_API SQLExecute(SQLHSTMT StatementHandle) {
+    if (!ptr_SQLExecute) *(void**)(&ptr_SQLExecute) = get_symbol("SQLExecute");
+    if (ptr_SQLExecute) return ptr_SQLExecute(StatementHandle);
+    else return SQL_ERROR;
+  }
+
+
+  SQLRETURN  SQL_API SQLBindCol(SQLHSTMT StatementHandle,
+                                SQLUSMALLINT ColumnNumber, SQLSMALLINT TargetType,
+                                SQLPOINTER TargetValue, SQLLEN BufferLength,
+                                SQLLEN *StrLen_or_Ind) {
+    if (!ptr_SQLBindCol) *(void**)(&ptr_SQLBindCol) = get_symbol("SQLBindCol");
+    if (ptr_SQLBindCol) return ptr_SQLBindCol(StatementHandle, ColumnNumber, TargetType, TargetValue, BufferLength, StrLen_or_Ind);
+    else return SQL_ERROR;
+  }
+
+
+  SQLRETURN  SQL_API SQLGetInfo(SQLHDBC ConnectionHandle,
+                                SQLUSMALLINT InfoType, SQLPOINTER InfoValue,
+                                SQLSMALLINT BufferLength, SQLSMALLINT *StringLength) {
+
+    if (!ptr_SQLGetInfo) *(void**)(&ptr_SQLGetInfo) = get_symbol("SQLGetInfo");
+    if (ptr_SQLGetInfo) return ptr_SQLGetInfo(ConnectionHandle, InfoType, InfoValue, BufferLength, StringLength);
+    else return SQL_ERROR;
+  }
+}
