@@ -18,6 +18,18 @@ term frequency transformations
   bm25
   tf_idf
 
+.. currentmodule:: graphlab
+
+topic models
+------------
+.. autosummary::
+  :toctree: generated/
+  :nosignatures:
+
+  topic_model.create
+  topic_model.TopicModel
+
+.. currentmodule:: graphlab.text_analytics
 
 utilities
 ------------------------
@@ -31,7 +43,3 @@ utilities
   random_split
   parse_sparse
   parse_docword
-
-
-
-

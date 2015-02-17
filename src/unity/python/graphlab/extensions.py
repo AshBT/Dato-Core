@@ -31,7 +31,7 @@ using the python import statement. Note that graphlab must be imported first.
 
 import graphlab as _gl
 import types as _types
-from graphlab.util import make_internal_url
+from graphlab.util import _make_internal_url
 from graphlab.cython.cy_sframe import UnitySFrameProxy as _UnitySFrameProxy
 from graphlab.cython.cy_sarray import UnitySArrayProxy as _UnitySArrayProxy
 from graphlab.cython.cy_graph import UnityGraphProxy as _UnityGraphProxy
@@ -598,7 +598,7 @@ def ext_import(soname, module_subpath=""):
     if os.path.exists(soname):
         soname = os.path.abspath(soname)
     else:
-        soname = make_internal_url(soname)
+        soname = _make_internal_url(soname)
     ret = unity.load_toolkit(soname, module_subpath)
     if len(ret) > 0:
         raise RuntimeError(ret)

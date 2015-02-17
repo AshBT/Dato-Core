@@ -18,6 +18,8 @@
 #include <logger/logger.hpp>
 #include <dlfcn.h>
 #include <cstring>
+#include <vector>
+#include <string>
 
 #include <sql.h>
 #include <sqlext.h>
@@ -107,29 +109,45 @@ extern "C" {
     static bool shim_attempted = false;
     if (shim_attempted == false) {
       shim_attempted = true;
-      if (libodbc_handle == NULL && (graphlab::LIBODBC_PREFIX.size() > 0)) {
-        std::string user_path = graphlab::LIBODBC_PREFIX + "/libodbc.so";
-        logstream(LOG_INFO) << "Trying " << user_path << std::endl;
-        libodbc_handle = dlopen(user_path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      const char *err_msg;
+
+      std::vector<std::string> potential_paths = {
+        // Look in the user-specified location
+        graphlab::LIBODBC_PREFIX + "/libodbc.so",
+        graphlab::LIBODBC_PREFIX + "/libodbc.dylib",
+        // find the system-installed so
+        "libodbc.so",
+        "libodbc.dylib",
+      };
+
+      // We don't want to freak customers out with failure messages as we try
+      // to load these libraries.  There's going to be a few in the normal
+      // case. Print them if we really didn't find libodbc.so.
+      std::vector<std::string> error_messages;
+
+      for(auto &i : potential_paths) {
+        logstream(LOG_INFO) << "Trying " << i << std::endl;
+        libodbc_handle = dlopen(i.c_str(), RTLD_NOW | RTLD_LOCAL);
+
+        if(libodbc_handle != NULL) {
+          logstream(LOG_INFO) << "Success!" << std::endl;
+          break;
+        } else {
+          err_msg = dlerror();
+          if(err_msg != NULL) {
+            error_messages.push_back(std::string(err_msg));
+          } else {
+            error_messages.push_back(std::string("dlerror returned NULL"));
+          }
+        }
       }
-      if (libodbc_handle == NULL && (graphlab::LIBODBC_PREFIX.size() > 0)) {
-        std::string user_path = graphlab::LIBODBC_PREFIX + "/libodbc.dylib";
-        logstream(LOG_INFO) << "Trying " << user_path << std::endl;
-        libodbc_handle = dlopen(user_path.c_str(), RTLD_NOW | RTLD_LOCAL);
-      }
-      if (libodbc_handle == NULL) {
-        // find a global libodbc.so
-        logstream(LOG_INFO) << "Trying global libodbc.so" << std::endl;
-        libodbc_handle = dlopen("libodbc.so", RTLD_NOW | RTLD_LOCAL);
-      }
-      if (libodbc_handle == NULL) {
-        // find a global libodbc.dylib
-        logstream(LOG_INFO) << "Trying global libodbc.dylib" << std::endl;
-        libodbc_handle = dlopen("libodbc.dylib", RTLD_NOW | RTLD_LOCAL);
-      }
+
       if (libodbc_handle == NULL) {
         logstream(LOG_INFO) << "Unable to load libodbc.{so,dylib}" << std::endl;
         odbc_dlopen_fail = true;
+        for(size_t i = 0; i < potential_paths.size(); ++i) {
+          logstream(LOG_INFO) << error_messages[i] << std::endl;
+        }
       }
     }
   }

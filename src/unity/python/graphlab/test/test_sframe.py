@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import graphlab as gl
 from graphlab.data_structures.sframe import SFrame
 from graphlab.data_structures.sarray import SArray
+from graphlab.data_structures.image import Image
 from graphlab.connect import main as glconnect
 from graphlab.connect import server
 from graphlab.util import _assert_sframe_equal
@@ -178,6 +179,16 @@ class SFrameTest(unittest.TestCase):
 
         sf = SFrame(data=self.dataframe, format='auto')
         self.__test_equal(sf, self.dataframe)
+
+        original_p = pd.DataFrame({'a':[1.0, float('nan')]})
+        effective_p = pd.DataFrame({'a':[1.0, None]})
+        sf = SFrame(data=original_p)
+        self.__test_equal(sf, effective_p)
+
+        original_p = pd.DataFrame({'a':['a',None,'b',float('nan')]})
+        effective_p = pd.DataFrame({'a':['a',None,'b',None]})
+        sf = SFrame(data=original_p)
+        self.__test_equal(sf, effective_p)
 
     def test_auto_parse_csv(self):
         with tempfile.NamedTemporaryFile(delete=False) as csvfile:
@@ -516,7 +527,6 @@ class SFrameTest(unittest.TestCase):
         sf2=sf2[['floats','ints','strings']]
         self.__test_equal(sf2, df)
 
-
     def test_head_tail(self):
         sf = SFrame(data=self.dataframe)
         assert_frame_equal(sf.head(4).to_dataframe(), self.dataframe.head(4))
@@ -526,6 +536,19 @@ class SFrameTest(unittest.TestCase):
             self.assertEqual(taildf['int_data'][i], self.dataframe['int_data'][i+6])
             self.assertEqual(taildf['float_data'][i], self.dataframe['float_data'][i+6])
             self.assertEqual(taildf['string_data'][i], self.dataframe['string_data'][i+6])
+
+    def test_head_tail_edge_case(self):
+        sf = SFrame()
+        self.assertEquals(sf.head().num_columns(), 0)
+        self.assertEquals(sf.tail().num_columns(), 0)
+        self.assertEquals(sf.head().num_rows(), 0)
+        self.assertEquals(sf.tail().num_rows(), 0)
+        sf = SFrame()
+        sf['a'] = []
+        self.assertEquals(sf.head().num_columns(), 1)
+        self.assertEquals(sf.tail().num_columns(), 1)
+        self.assertEquals(sf.head().num_rows(), 0)
+        self.assertEquals(sf.tail().num_rows(), 0)
 
     def test_transform(self):
         sf = SFrame(data=self.dataframe)
@@ -842,11 +865,11 @@ class SFrameTest(unittest.TestCase):
         assert sf is sf2
 
         self.assertEquals(sf.column_names(), ['X1', 'X2', 'X4', 'X5'])
-        
+
         sf2 = sf.remove_columns(['X2', 'X5'])
-        
+
         assert sf is sf2
-        
+
         self.assertEquals(sf.column_names(), ['X1', 'X4'])
 
         # with a generator expression
@@ -855,8 +878,8 @@ class SFrameTest(unittest.TestCase):
         assert sf is sf2
 
         self.assertEquals(sf.column_names(), ['X4'])
-        
-        
+
+
     def test_remove_bad_column(self):
         sf = SFrame()
 
@@ -868,16 +891,16 @@ class SFrameTest(unittest.TestCase):
         sf.add_column(SArray(self.string_data))
 
         self.assertEquals(sf.column_names(), ['X1', 'X2', 'X3', 'X4', 'X5'])
-        
+
         self.assertRaises(KeyError, lambda: sf.remove_column('bad'))
 
         self.assertEquals(sf.column_names(), ['X1', 'X2', 'X3', 'X4', 'X5'])
 
         self.assertRaises(KeyError, lambda: sf.remove_columns(['X1', 'X2', 'X3', 'bad', 'X4']))
-                
+
         self.assertEquals(sf.column_names(), ['X1', 'X2', 'X3', 'X4', 'X5'])
-        
-        
+
+
     def __generate_synthetic_sframe__(self, num_users):
         """
         synthetic collaborative data.
@@ -1273,6 +1296,30 @@ class SFrameTest(unittest.TestCase):
 
         #consume
         sf.__materialize__()
+
+    def test_print_sframe(self):
+        sf = SFrame()
+
+        def _test_print():
+            sf.__repr__()
+            sf._repr_html_()
+            sf.print_rows()
+
+        n = 20
+        sf['int'] = [i for i in range(n)]
+        sf['float'] = [float(i) for i in range(n)]
+        sf['str'] = [str(i) for i in range(n)]
+        uc = '\xe5\xa4\xa7\xe5\xa4\xb4'  # dato pronounced in chinese, big head
+        sf['unicode'] = [uc for i in range(n)]
+        sf['array'] = [array.array('d', [i]) for i in range(n)]
+        sf['list'] = [[i, float(i), [i]] for i in range(n)]
+        utc = dt.datetime.strptime('2011-01-21 02:37:21', '%Y-%m-%d %H:%M:%S')
+        sf['dt'] = [utc for i in range(n)]
+        sf['img'] = [Image() for i in range(n)]
+        sf['long_str'] = ["".join([str(i)] * 50) for i in range(n)]
+        sf['long_unicode'] = ["".join([uc] * 50) for i in range(n)]
+        sf['bad_unicode'] = ['\x9d' + uc for i in range(n)]
+        _test_print()
 
     def test_print_lazy_sframe(self):
         sf1 = SFrame(data=self.dataframe)
@@ -1799,6 +1846,12 @@ class SFrameTest(unittest.TestCase):
         sf['b'] = range(0, num_rows);
         result = sf.pack_columns(['a', 'b']);
         self.assertEqual(len(result), num_rows);
+
+    def test_pack_columns_dtype(self):
+        a = SFrame({'name':[-140500967,-1405039672],'data':[3,4]})
+        b = a.pack_columns(['name','data'],dtype=array.array)
+        expected = SArray([[-140500967, 3],[-1405039672,4]])
+        self.__assert_sarray_equal(b['X1'], expected)
 
     def test_unpack_list(self):
         sa = SArray([
@@ -2621,7 +2674,7 @@ class SFrameTest(unittest.TestCase):
 if __name__ == "__main__":
 
     import sys
-    
+
     # Check if we are supposed to connect to another server
     for i, v in enumerate(sys.argv):
         if v.startswith("ipc://"):

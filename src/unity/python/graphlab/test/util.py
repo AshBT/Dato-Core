@@ -22,7 +22,10 @@ import time
 import tempfile
 import shutil
 import math
+import string
+import numpy as np
 from pandas.util.testing import assert_frame_equal
+import graphlab as gl
 
 class SFrameComparer():
     """
@@ -136,3 +139,80 @@ def start_test_tcp_server(auth_token=None):
 
     assert(num_attempted_ports < MAX_NUM_PORT_ATTEMPTS)
     return server
+
+
+def uniform_string_column(n, word_length, alphabet_size, missingness=0.):
+    """
+    Return an SArray of strings constructed uniformly randomly from the first
+    'num_letters' of the lower case alphabet.
+
+    Parameters
+    ----------
+    n : int
+        Number of entries in the output SArray.
+
+    word_length : int
+        Number of characters in each string.
+
+    alphabet_size : int
+        Number of characters in the alphabet.
+
+    missingness : float, optional
+        Probability that a given entry in the output is missing.
+
+    Returns
+    -------
+    out : SArray
+        One string "word" in each entry of the output SArray.
+    """
+    result = []
+    letters = string.ascii_letters[:alphabet_size]
+
+    for i in range(n):
+        missing_flag = random.random()
+        
+        if missing_flag < missingness:
+            result.append(None)
+        else:
+            word = []
+            for j in range(word_length):
+                word.append(random.choice(letters))
+            result.append(''.join(word))
+
+    return gl.SArray(result)
+
+
+def uniform_numeric_column(n, col_type=float, range=(0, 1), missingness=0.):
+    """
+    Return an SArray of uniformly random numeric values.
+
+    Parameters
+    ----------
+    n : int
+        Number of entries in the output SArray.
+
+    col_type : type, optional
+        Type of the output SArray. Default is floats.
+
+    range : tuple[int, int], optional
+        Minimum and maximum of the uniform distribution from which values are
+        chosen.
+
+    missingness : float, optional
+        Probability that a given entry in the output is missing.
+
+    Returns
+    -------
+    out : SArray
+    """
+    if col_type == int:
+        v = np.random.randint(low=range[0], high=range[1], size=n).astype(float)
+    else:
+        v = np.random.rand(n)
+        v = v * (range[1] - range[0]) + range[0]
+
+    idx_na = np.random.rand(n) < missingness
+    v[idx_na] = None
+    v = np.where(np.isnan(v), None, v)
+
+    return gl.SArray(v, dtype=col_type)

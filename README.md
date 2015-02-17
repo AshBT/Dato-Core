@@ -1,18 +1,47 @@
-Graphlab Create
-===============
+Dato Core
+=========
 
 Introduction
 ------------
-
-GraphLab Create is a machine learning platform that enables data scientists and app developers to easily create intelligent apps at scale. Building an intelligent, predictive application involves iterating over multiple steps: cleaning the data, developing features, training a model, and creating and maintaining a predictive service. GraphLab Create™ does all of this in one platform. It is easy to use, fast, and powerful.
+Dato Core is the open source piece of GraphLab Create, a Python-based machine
+learning platform that enables data scientists and app developers to easily
+create intelligent apps at scale: from prototype to production. 
  
 For more details on the GraphLab Create see http://dato.com, including
-documentation, tutorial, etc.
+documentation, tutorials, etc.
+
+The Dato Open Source project provides the complete implementation for 
+ - SFrame v1 and v2 format reader and writers
+ - SFrame query evaluator
+ - SGraph 
+ - Graph Analytics implementations 
+ - The implementations of the C++ SDK surface area (gl_sframe, gl_sarray,
+     gl_sgraph)
+
+Included within the release are also a large number of utility code such as:
+ - Sketch implementations
+ - Serialization
+ - flexible_type (efficient runtime typed object)
+ - C++ interprocess communication library (used for C++ <--> Python
+     communication)
+ - PowerGraph's RPC implementation
 
 License
 -------
 GNU Affero General Public License. See [license](LICENSE).
 
+Open Source Commitment
+----------------------
+We will keep the open sourced components up to date with the latest released
+version of GraphLab Create by issuing a large "version update" pull request
+with every new version of GraphLab Create.
+
+Source Stability
+----------------
+The utility code is generally stable and will not change significantly over
+time. The SFrame v1 and v2 formats are considered stable. A v3 format is in
+the works to introduce greater compression and performance. The query evaluator
+is in the midst of a complete rearchitecting. 
 
 Dependencies
 ------------
@@ -20,32 +49,32 @@ Dependencies
 GraphLab Create now automatically satisfied most dependencies. 
 There are however, a few dependencies which we cannot easily satisfy:
 
-* On OS X: Apple clang 4.0 (LLVM 3.1) [Required]
+* On OS X: Apple XCode 6 Command Line Tools [Required]
   +  Required for compiling GraphLab Create.
 
-* On Linux: g++ (>= 4.7) or clang (>= 3.1) [Required]
+* On Linux: g++ (>= 4.8) or clang (>= 3.4) [Required]
   +  Required for compiling GraphLab Create.
 
 * *nix build tools: patch, make [Required]
-   +  Should come with most Mac/Linux systems by default. Recent Ubuntu version will require to install the build-essential package.
+   +  Should come with most Mac/Linux systems by default. Recent Ubuntu version
+   will require to install the build-essential package.
+
+* cython [Required]
+   +  For compilation of GraphLab Create
 
 * zlib [Required]
-   +   Comes with most Mac/Linux systems by default. Recent Ubuntu version will require the zlib1g-dev package.
-
-* Open MPI or MPICH2 [Strongly Recommended]
-   + Required for running GraphLab distributed. 
+   +   Comes with most Mac/Linux systems by default. Recent Ubuntu version will
+   require the zlib1g-dev package.
 
 * JDK 6 or greater [Optional]
    + Required for HDFS support 
 
+* Open MPI or MPICH2 [Optional]
+   + Required only for the RPC library inherited from PowerGraph
 
-    
 ### Satisfying Dependencies on Mac OS X
 
-Installing XCode with the command line tools (in XCode >= 4.3 you have to do this
-manually in the XCode Preferences -> Download pane), satisfies all of these
-dependencies.  
-
+Installing XCode 6 with the command line tools.
 
 
 ### Satisfying Dependencies on Ubuntu
@@ -73,11 +102,11 @@ Compiling
 
     ./configure
 
-Running configure will create two sub-directories, release/ and
-debug/ . cd into src/unity/ under either of these directories and running make will build the
-release or the debug versions respectively. 
+Running configure will create two sub-directories, release/ and debug/ . cd
+into src/unity/ under either of these directories and running make will build
+the release or the debug versions respectively. 
 
-We recommend using make’s parallel build feature to accelerate the compilation
+We recommend using make's parallel build feature to accelerate the compilation
 process. For instance:
 
     make -j 4
@@ -87,7 +116,8 @@ GraphLab Create does require a large amount of memory to compile with the
 heaviest toolkit requiring 1GB of RAM. Where K is the amount of memory you
 have on your machine in GB, we recommend not exceeding make -j K
 
-To generate the python, cd one directory further into the python directory and run make again.
+To generate the python, cd one directory further into the python directory and
+run make again.
 
 To use your dev build export these environment variables:
 export PYTHONPATH="<repo root>/debug/src/unity/python/"
@@ -113,5 +143,5 @@ ctest
 Writing Your Own Apps
 ---------------------
 
-See: https://github.com/graphlab-code/GraphLab-Create-SDK
+See: https://github.com/dato-code/GraphLab-Create-SDK
 

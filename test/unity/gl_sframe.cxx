@@ -20,6 +20,7 @@
 #include <unity/lib/gl_sframe.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/filesystem.hpp>
+#include <parallel/lambda_omp.hpp>
 
 using namespace graphlab;
 
@@ -324,6 +325,20 @@ class gl_sframe_test: public CxxTest::TestSuite {
       _assert_sarray_equals(g["id"], {1,2,3,4,5});
     }
 
+    void test_parallel_range_iterator() {
+      graphlab::gl_sframe sf;
+      sf.add_column(gl_sarray::from_const(0, 1000), "src_1");
+      sf.add_column(gl_sarray::from_const(1, 1000), "src_2");
+      size_t sf_size = sf.size();
+      in_parallel([&](size_t thread_idx, size_t num_threads) {
+        size_t start_idx = sf_size * thread_idx / num_threads;
+        size_t end_idx = sf_size * (thread_idx + 1) / num_threads;
+        for (const auto& v: sf.range_iterator(start_idx, end_idx)) { 
+          TS_ASSERT_EQUALS((int)v[0], 0);
+          TS_ASSERT_EQUALS((int)v[1], 1);
+        }
+      });
+    }
 
   private:
 
@@ -379,4 +394,5 @@ class gl_sframe_test: public CxxTest::TestSuite {
         _assert_flexvec_equals(sa[i], sb[i]);
       }
     }
+
 };

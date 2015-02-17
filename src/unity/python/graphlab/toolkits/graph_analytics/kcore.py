@@ -43,7 +43,7 @@ def get_default_options():
 
 class KcoreModel(_ModelBase):
     """
-    A KcoreModel object contains a core ID for each vertex, and the total 
+    A KcoreModel object contains a core ID for each vertex, and the total
     number of cores in the graph.
 
     The core ID of a vertex is a measure of its global centrality.
@@ -70,9 +70,9 @@ class KcoreModel(_ModelBase):
     | training_time | Total training time of the model                   |
     +---------------+----------------------------------------------------+
 
-    This model cannot be constructed directly.  Instead, use 
+    This model cannot be constructed directly.  Instead, use
     :func:`graphlab.kcore.create` to create an instance
-    of this model. A detailed list of parameter options and code samples 
+    of this model. A detailed list of parameter options and code samples
     are available in the documentation for the create function.
 
     See Also
@@ -138,6 +138,13 @@ def create(graph, kmin=0, kmax=10, verbose=True):
     ``g`` using:
 
     >>> kcore_id = kc['core_id']     # SFrame
+
+    We can add the new core id field to the original graph g using:
+
+    >>> g.vertices['core_id'] = kc['graph'].vertices['core_id']
+
+    Note that the task above does not require a join because the vertex
+    ordering is preserved through ``create()``.
 
     See Also
     --------

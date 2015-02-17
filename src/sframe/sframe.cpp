@@ -519,7 +519,7 @@ bool sframe::set_num_segments(size_t numseg) {
 sframe::iterator sframe::get_output_iterator(size_t segmentid) {
   ASSERT_MSG(inited, "Invalid SFrame");
   ASSERT_MSG(writing, "SFrame not opened for writing");
-  ASSERT_MSG(segmentid < num_segments(), "Invalid segment ID");
+  ASSERT_MSG((segmentid < num_segments() || num_segments() == 0), "Invalid segment ID");
   std::vector<flex_type_enum> ctypes = column_types();
   return sframe::iterator(
       [=](const std::vector<flexible_type>& val)->void{

@@ -17,6 +17,7 @@
 #include <cxxtest/TestSuite.h>
 #include <boost/range/combine.hpp>
 #include <unity/lib/gl_sarray.hpp>
+#include <parallel/lambda_omp.hpp>
 #include <unity/lib/gl_sframe.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -363,6 +364,17 @@ class gl_sarray_test: public CxxTest::TestSuite {
         ++ctr;
       }
       TS_ASSERT_EQUALS(ctr, 12);
+
+      // parallel range iterator test
+      graphlab::gl_sarray src = gl_sarray::from_const(0, 1000);
+      size_t src_size = src.size();
+      in_parallel([&](size_t thread_idx, size_t num_threads) {
+        size_t start_idx = src_size * thread_idx / num_threads;
+        size_t end_idx = src_size * (thread_idx + 1) / num_threads;
+        for (const auto& v: src.range_iterator(start_idx, end_idx)) { 
+          TS_ASSERT_EQUALS((int)v, 0);
+        }
+      });
 
       // range iterator test
       TS_ASSERT_EQUALS(t.size(), expected.size());

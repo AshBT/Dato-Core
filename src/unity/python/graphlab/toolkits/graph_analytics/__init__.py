@@ -1,20 +1,4 @@
-'''
-Copyright (C) 2015 Dato, Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
-""" 
+"""
 The graph analytics toolkit contains methods for analyzing a
 :class:`~graphlab.SGraph`. Each method takes an input graph and returns a model
 object, which contains the training time, an :class:`~graphlab.SFrame` with the
@@ -123,6 +107,24 @@ documentation, as well as the data science `Gallery
 the User Guide
 <https://dato.com/learn/userguide/index.html#Modeling_data_Graph_analytics>`_.
 """
+
+'''
+Copyright (C) 2015 Dato, Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
 
 import pagerank
 import triangle_counting

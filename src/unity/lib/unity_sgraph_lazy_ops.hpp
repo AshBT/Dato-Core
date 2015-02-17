@@ -134,9 +134,16 @@ namespace graphlab {
   };
 
   struct select_vertex_fields_op: operator_type {
-    select_vertex_fields_op(const std::vector<std::string>& _fields, size_t group) : 
-        fields(_fields.begin(), _fields.end()), group(group) { 
-          DASSERT_TRUE(fields.count(sgraph::VID_COLUMN_NAME) > 0);
+    select_vertex_fields_op(const std::vector<std::string>& _fields, size_t group) :
+      group(group) { 
+          std::set<std::string> unique_fields;
+          for (const auto& f: _fields) {
+            if (!unique_fields.count(f)) {
+              fields.push_back(f);
+              unique_fields.insert(unique_fields.end(), f);
+            }
+          }
+          DASSERT_TRUE(unique_fields.count(sgraph::VID_COLUMN_NAME) > 0);
         }
 
     virtual size_t num_arguments() { return 1; }
@@ -145,15 +152,22 @@ namespace graphlab {
                          const std::vector<sgraph*>& parents) {
       output.select_vertex_fields(fields, group);
     }
-    const std::set<std::string> fields;
+    std::vector<std::string> fields;
     const size_t group;
   };
 
   struct select_edge_fields_op: operator_type {
     select_edge_fields_op(const std::vector<std::string>& _fields, size_t groupa, size_t groupb) :
-        fields(_fields.begin(), _fields.end()), groupa(groupa), groupb(groupb) { 
-          DASSERT_TRUE(fields.count(sgraph::SRC_COLUMN_NAME) > 0);
-          DASSERT_TRUE(fields.count(sgraph::DST_COLUMN_NAME) > 0);
+        groupa(groupa), groupb(groupb) { 
+          std::set<std::string> unique_fields;
+          for (const auto& f: _fields) {
+            if (!unique_fields.count(f)) {
+              fields.push_back(f);
+              unique_fields.insert(unique_fields.end(), f);
+            }
+          }
+          DASSERT_TRUE(unique_fields.count(sgraph::SRC_COLUMN_NAME) > 0);
+          DASSERT_TRUE(unique_fields.count(sgraph::DST_COLUMN_NAME) > 0);
         }
 
     virtual size_t num_arguments() { return 1; }
@@ -162,7 +176,7 @@ namespace graphlab {
                          const std::vector<sgraph*>& parents) {
       output.select_edge_fields(fields, groupa, groupb);
     }
-    const std::set<std::string> fields;
+    std::vector<std::string> fields;
     const size_t groupa, groupb;
   };
 }

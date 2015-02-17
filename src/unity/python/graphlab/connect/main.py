@@ -22,7 +22,7 @@ from graphlab.cython.cy_unity import UnityGlobalProxy
 from graphlab.cython.cy_ipc import PyCommClient as Client
 from graphlab.cython.cy_ipc import get_public_secret_key_pair
 from graphlab.connect.server import LocalServer, RemoteServer
-from graphlab.connect import __SERVER__, __CLIENT__
+from graphlab.connect import __SERVER__, __CLIENT__, _get_metric_tracker
 import graphlab.product_key
 
 import decorator
@@ -85,6 +85,7 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
         __LOGGER__.debug("Server type: %s" % server_type)
     except ValueError as e:
         __LOGGER__.error(e)
+        _get_metric_tracker().track('server_launch.server_type_error', send_sys_info=True)
         return
 
     # get and validate the product / registration key
@@ -92,6 +93,7 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
         product_key = graphlab.product_key.get_product_key()
     except KeyError as k:
         __LOGGER__.error(k.message)
+        # metric is tracked in product_key.py for different code paths
         return
 
     # product key check. This may fail if there are issues running
@@ -99,16 +101,18 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
     try:
       product_key_good = graphlab.product_key.is_product_key_valid(product_key)
     except RuntimeError as r:
-      __LOGGER__.error("Fatal error. The unity_server process cannot be started. There may have been an "
+        __LOGGER__.error("Fatal error. The unity_server process cannot be started. There may have been an "
                        "issue during installation of graphlab-create. Please uninstall graphlab-create "
                        "and reinstall it, looking for errors that may occur during installation. "
                        "If the problem persists, please contact support@dato.com.")
-      return
+        _get_metric_tracker().track('server_launch.unity_server_error', send_sys_info=True)
+        return
 
     # verify product key is good
     if (not product_key_good):
         __LOGGER__.error("Product Key validation failed, please confirm your product key is correct. "
                          "If you believe this key to be valid, please contact support@dato.com")
+        _get_metric_tracker().track('server_launch.product_key_invalid')
         return
 
     # construct a server server instance based on the server_type

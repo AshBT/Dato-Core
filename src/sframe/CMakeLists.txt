@@ -71,3 +71,22 @@ project(sframe)
  file(DOWNLOAD http://s3-us-west-2.amazonaws.com/glbin-engine/graphlab-create-spark-integration_2.10-1.0.jar ./src/sframe/graphlab-create-spark-integration.jar
       EXPECTED_MD5 5c4eebfd0426e4f5189c7e576639bc6a)
 
+ADD_CUSTOM_TARGET(copy_spark_wrapper)
+ADD_CUSTOM_COMMAND(
+  TARGET copy_spark_wrapper
+  COMMENT "copy spark_pipe_wrapper"
+  COMMAND
+  ${CMAKE_COMMAND} -E copy ../../../src/sframe/spark_pipe_wrapper .
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+ADD_CUSTOM_COMMAND(
+  TARGET copy_spark_wrapper
+  COMMENT "copy sys_util.py"
+  COMMAND
+  ${CMAKE_COMMAND} -E copy ../../../src/unity/python/graphlab/sys_util.py  .
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+add_dependencies(rddtosf_pickle copy_spark_wrapper)
+add_dependencies(rddtosf_nonpickle copy_spark_wrapper)
+add_dependencies(sftordd_pickle copy_spark_wrapper)

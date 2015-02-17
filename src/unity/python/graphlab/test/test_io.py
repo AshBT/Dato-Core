@@ -98,7 +98,7 @@ class LocalFSConnectorTests(unittest.TestCase):
         (self.graph, self.sframe, self.model) = create_test_objects()
 
     def _test_read_write_helper(self, url, content):
-        url = graphlab.util.make_internal_url(url)
+        url = graphlab.util._make_internal_url(url)
         glconnect.get_unity().__write__(url, content)
         content_read = glconnect.get_unity().__read__(url)
         self.assertEquals(content_read, content)
@@ -152,7 +152,7 @@ class RemoteFSConnectorTests(unittest.TestCase):
         self.server.stop()
 
     def _test_read_write_helper(self, url, content):
-        url = graphlab.util.make_internal_url(url)
+        url = graphlab.util._make_internal_url(url)
         glconnect.get_unity().__write__(url, content)
         content_read = glconnect.get_unity().__read__(url)
         self.assertEquals(content_read, content)
@@ -190,7 +190,7 @@ class HttpConnectorTests(unittest.TestCase):
         self.url = "http://s3-us-west-2.amazonaws.com/testdatasets/a_to_z.txt.gz"
 
     def _test_read_helper(self, url, content_expected):
-        url = graphlab.util.make_internal_url(url)
+        url = graphlab.util._make_internal_url(url)
         content_read = glconnect.get_unity().__read__(url)
         self.assertEquals(content_read, content_expected)
 
@@ -213,7 +213,7 @@ class HDFSConnectorTests(unittest.TestCase):
         (self.graph, self.sframe, self.model) = create_test_objects()
 
     def _test_read_write_helper(self, url, content_expected):
-        url = graphlab.util.make_internal_url(url)
+        url = graphlab.util._make_internal_url(url)
         glconnect.get_unity().__write__(url, content_expected)
         content_read = glconnect.get_unity().__read__(url)
         self.assertEquals(content_read, content_expected)
@@ -287,7 +287,7 @@ class S3ConnectorTests(unittest.TestCase):
                 self.has_s3 = False
 
     def _test_read_write_helper(self, url, content_expected):
-        s3url = graphlab.util.make_internal_url(url)
+        s3url = graphlab.util._make_internal_url(url)
         glconnect.get_unity().__write__(s3url, content_expected)
         content_read = glconnect.get_unity().__read__(s3url)
         self.assertEquals(content_read, content_expected)

@@ -147,7 +147,7 @@ class parallel_csv_parser {
         //join_background_write();
 
         if(cppipc::must_cancel()) {
-          log_and_throw(std::string("CSV parsing cancelled\n"));
+          log_and_throw(std::string("CSV parsing cancelled"));
         }
 
         // we need to truncate the current writing buffer to ensure that we don't output more than

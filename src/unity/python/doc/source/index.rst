@@ -17,14 +17,25 @@ Some key features of GraphLab Create are:
 - Easily deploy data products in the cloud using Predictive Services.
 - Visualize data for exploration and production monitoring.
 
+.. currentmodule:: graphlab
+
 Contents
 ========
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
 
     graphlab.data_structures.rst
     graphlab.toolkits.rst
+
+.. toctree::
+    :maxdepth: 2
+
     graphlab.deploy.rst
+
+.. toctree::
+    :maxdepth: 1
+
     graphlab.aws.rst
     graphlab.canvas.rst
+    graphlab.config.rst

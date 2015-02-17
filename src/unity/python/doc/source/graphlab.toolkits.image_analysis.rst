@@ -5,13 +5,9 @@
 
 .. currentmodule:: graphlab
 
-utilities
----------
-
 .. autosummary::
   :toctree: generated/
   :nosignatures:
 
   image_analysis.load_images
   image_analysis.resize 
-  

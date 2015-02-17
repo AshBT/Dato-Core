@@ -38,7 +38,7 @@ def get_default_options():
     See Also
     --------
     ShortestPathModel.get_current_options
-    
+
     Examples
     --------
     >>> graphlab.shortest_path.get_default_options()
@@ -75,9 +75,9 @@ class ShortestPathModel(_ModelBase):
     | training_time  | Total training time of the model                           |
     +----------------+------------------------------------------------------------+
 
-    This model cannot be constructed directly.  Instead, use 
+    This model cannot be constructed directly.  Instead, use
     :func:`graphlab.shortest_path.create` to create an instance
-    of this model. A detailed list of parameter options and code samples 
+    of this model. A detailed list of parameter options and code samples
     are available in the documentation for the create function.
 
     See Also
@@ -187,9 +187,9 @@ class ShortestPathModel(_ModelBase):
                 path_highlight = list(set.intersection(path_names, set(highlight)))
 
             plot = sub_g.show(vlabel='id', highlight=path_highlight, **kwargs)
-            if _HAS_IPYTHON:   
+            if _HAS_IPYTHON:
                 _IPython.display(plot)
-      
+
         return path
 
     def _generate_path_sframe(self):
@@ -219,7 +219,7 @@ class ShortestPathModel(_ModelBase):
         #         dst['__parent__'] = max(dst['__parent__'], src['row_id'])
         #     return (src, edge, dst)
         #
-        # the internal lambda appear to have some issues. 
+        # the internal lambda appear to have some issues.
         import graphlab
         traverse_fun = lambda src, edge, dst:  \
             graphlab.extensions._toolkits.graph.sssp.shortest_path_traverse_function(src, edge, dst,
@@ -275,6 +275,13 @@ def create(graph, source_vid, weight_field="", max_distance=1e30, verbose=True):
 
     >>> sp_sframe = sp['distance']   # SFrame
 
+    We can add the new distance field to the original graph g using:
+
+    >>> g.vertices['distance_to_1'] = sp['graph'].vertices['distance']
+
+    Note that the task above does not require a join because the vertex
+    ordering is preserved through ``create()``.
+
     To get the actual path from the source vertex to any destination vertex:
 
     >>> path = sp.get_path(vid=10)
@@ -306,11 +313,11 @@ def _compute_shortest_path(graph, source_vids, dest_vids, weight_field=""):
     Computes shortest paths from any vertex in source_vids to any vertex
     in dest_vids.  Note that because SGraph is directed, shortest paths are
     also directed. To find undirected shortes paths add edges to the SGraph in
-    both directions. Returns a list of shortest paths between source_vids 
+    both directions. Returns a list of shortest paths between source_vids
     and dest_vids.
 
-    Note that this function does not compute all shortest paths between every 
-    (source, dest) pair. It computes 
+    Note that this function does not compute all shortest paths between every
+    (source, dest) pair. It computes
 
     Parameters
     ----------
@@ -329,7 +336,7 @@ def _compute_shortest_path(graph, source_vids, dest_vids, weight_field=""):
 
     Returns
     -------
-    out :  An SArray of lists of all the same length. 
+    out :  An SArray of lists of all the same length.
         Each list describes a path of vertices leading from one source
         vertex to one destination vertex.
 

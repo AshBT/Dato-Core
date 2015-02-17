@@ -272,11 +272,11 @@ class fixed_size_cache_manager {
   /**
    * Increments cache utilization counter
    */
-  void increment_utilization(int increment);
+  void increment_utilization(ssize_t increment);
   /**
    * Decrements cache utilization counter
    */
-  void decrement_utilization(int decrement);
+  void decrement_utilization(ssize_t decrement);
 
   /**
    * Tries to evict some stuff out of cache.

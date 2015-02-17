@@ -20,7 +20,7 @@ namespace graphlab {
 namespace fileio {
 
 enum class file_status {
-  MISSING, REGULAR_FILE, DIRECTORY
+  MISSING, REGULAR_FILE, DIRECTORY, FS_UNAVAILABLE
 };
 
 /**

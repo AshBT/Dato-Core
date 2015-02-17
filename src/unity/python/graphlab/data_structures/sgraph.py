@@ -32,7 +32,7 @@ from graphlab.data_structures.sarray import SArray
 from graphlab.data_structures.gframe import GFrame, VERTEX_GFRAME, EDGE_GFRAME
 from graphlab.cython.cy_graph import UnityGraphProxy
 from graphlab.cython.context import debug_trace as cython_context
-from graphlab.util import _check_canvas_enabled, make_internal_url
+from graphlab.util import _check_canvas_enabled, _make_internal_url
 from graphlab.deps import pandas as pd
 from graphlab.deps import HAS_PANDAS
 import inspect
@@ -202,7 +202,7 @@ class SGraph(object):
 
     See Also
     --------
-    Vertex, Edge, SFrame
+    SFrame
 
     Notes
     -----
@@ -607,7 +607,7 @@ class SGraph(object):
 
         See Also
         --------
-        vertices, Vertex, Edge, SFrame, add_edges
+        vertices, SFrame, add_edges
 
         Notes
         -----
@@ -678,7 +678,7 @@ class SGraph(object):
 
         See Also
         --------
-        edges, Vertex, Edge, SFrame, add_vertices
+        edges, SFrame, add_vertices
 
         Notes
         -----
@@ -812,8 +812,8 @@ class SGraph(object):
 
         Parameters
         ----------
-        fields : list [string]
-            A list of field names to select.
+        fields : string | list [string]
+            A single field name or a list of field names to select.
 
         Returns
         -------
@@ -837,16 +837,24 @@ class SGraph(object):
         """
         _mt._get_metric_tracker().track('sgraph.select_fields')
 
+        if (type(fields) is str):
+            fields = [fields]
+        if not isinstance(fields, list) or not all(type(x) is str for x in fields):
+            raise TypeError('\"fields\" must be a str or list[str]')
+
         vfields = self.__proxy__.get_vertex_fields()
         efields = self.__proxy__.get_edge_fields()
         selected_vfields = []
         selected_efields = []
         for f in fields:
+            found = False
             if f in vfields:
                 selected_vfields.append(f)
-            elif f in efields:
+                found = True
+            if f in efields:
                 selected_efields.append(f)
-            else:
+                found = True
+            if not found:
                 raise ValueError('Field %s not in graph' % f)
 
         with cython_context():
@@ -972,6 +980,11 @@ class SGraph(object):
             if f in mutated_fields:
                 raise ValueError('mutated_fields cannot contain %s' % f)
 
+        all_fields = self.get_fields()
+        if not set(mutated_fields).issubset(set(all_fields)):
+            extra_fields = list(set(mutated_fields).difference(set(all_fields)))
+            raise ValueError('graph does not contain fields: %s' % str(extra_fields))
+
         # select input fields
         if input_fields is None:
             input_fields = self.get_fields()
@@ -979,8 +992,8 @@ class SGraph(object):
             input_fields = [input_fields]
 
         # make input fields a superset of mutated_fields
-        input_fields = list(set(input_fields + mutated_fields))
-
+        input_fields_set = set(input_fields + mutated_fields)
+        input_fields = [x for x in self.get_fields() if x in input_fields_set]
         g = self.select_fields(input_fields)
 
         nativefn = None
@@ -1045,7 +1058,7 @@ class SGraph(object):
             raise ValueError('Invalid format: %s. Supported formats are: %s'
                              % (format, ['binary', 'json', 'csv']))
         with cython_context():
-            self.__proxy__.save_graph(make_internal_url(filename), format)
+            self.__proxy__.save_graph(_make_internal_url(filename), format)
 
 
     @_check_canvas_enabled
@@ -1325,7 +1338,7 @@ def load_sgraph(filename, format='binary', delimiter='auto'):
     with cython_context():
         g = None
         if format is 'binary':
-            proxy = glconnect.get_unity().load_graph(make_internal_url(filename))
+            proxy = glconnect.get_unity().load_graph(_make_internal_url(filename))
             g = SGraph(_proxy=proxy)
         elif format is 'snap':
             if delimiter == 'auto':

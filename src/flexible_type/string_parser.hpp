@@ -105,6 +105,7 @@ struct string_parser
     }
     return true;
   }
+#define PUSH_CHAR(c) ret = ret + c; escape_sequence = (c == config.escape_char);
 
 // insert a character into the field buffer. resizing it if necessary
 
@@ -121,7 +122,15 @@ struct string_parser
     tokenizer_state state = tokenizer_state::START_FIELD; 
     bool keep_parsing = true;
     char quote_char = 0;
+    // this is set to true for the character immediately after an escape character
+    // and false all other times
+    bool escape_sequence = false;
     while(keep_parsing && cur != last) {
+      // since escape_sequence can only be true for one character after it is
+      // set to true. I need a flag here. if reset_escape_sequence is true, the
+      // at the end of the loop, I clear escape_sequence
+      bool reset_escape_sequence = escape_sequence;
+
       // Next character in file
       char c = *cur;
       if(state != tokenizer_state::IN_QUOTED_FIELD && 
@@ -150,24 +159,24 @@ struct string_parser
            state = tokenizer_state::IN_QUOTED_FIELD;
          } else {
            /* begin new unquoted field */
-           ret = ret + c;
+           PUSH_CHAR(c);
            state = tokenizer_state::IN_FIELD;
          }
          break;
 
        case tokenizer_state::IN_FIELD:
          /* normal character - save in field */
-         ret = ret + c;
+         PUSH_CHAR(c);
          break;
 
        case tokenizer_state::IN_QUOTED_FIELD:
          /* in quoted field */
-         if (c == quote_char) {
+         if (c == quote_char && !escape_sequence) {
            if (c == '\"' && config.double_quote) {
              /* doublequote; " represented by "" */
              // look ahead one character
              if (cur + 1 < last && *cur == quote_char) {
-               ret = ret + c;
+               PUSH_CHAR(c);
                ++cur;
                break;
              }
@@ -177,10 +186,11 @@ struct string_parser
          }
          else {
            /* normal character - save in field */
-           ret = ret + c;
+           PUSH_CHAR(c);
          }
          break;
       }
+      if (reset_escape_sequence) escape_sequence = false;
     }
     if (cur == first) return false;
     else {
@@ -218,5 +228,7 @@ struct make_primitive<terminal_ex<parser_impl::tag::restricted_string, fusion::v
 };
 
 }}} // namespace qi, spirit, boost
+
+#undef PUSH_CHAR
 
 #endif

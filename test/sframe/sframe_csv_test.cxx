@@ -230,12 +230,16 @@ csv_test escape_parsing() {
   std::stringstream strm;
   strm << "str1 str2\n"
        << "\\n  \"\\n\"\n"
-       << "\\t  \\0abf\n";
+       << "\\t  \\0abf\n"
+       << "\\\"a  \"\\\"b\"\n"
+       << "{\"a\":\"\\\"\"} [a,\"b\",\\\"c]\n";
   ret.file = strm.str();
   ret.tokenizer.delimiter = " ";
 
   ret.values.push_back({"\n","\n"});
   ret.values.push_back({"\t","\\0abf"});
+  ret.values.push_back({"\"a","\"b"});
+  ret.values.push_back({flex_dict({{"a","\""}}),flex_list({"a","b","\"c"})});
 
   ret.types = {{"str1", flex_type_enum::UNDEFINED},
                {"str2", flex_type_enum::UNDEFINED}};

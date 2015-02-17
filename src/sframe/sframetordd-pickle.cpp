@@ -36,7 +36,12 @@
 
 using namespace graphlab;
 namespace python = boost::python;
-
+/**
+ * sframetordd-pickle.cpp reads from stdin a range [row_start,row_end) and output
+ * a new sframe that only contains rows from input sframe with their indices i inside
+ * the range row_start <= i < row_end. 
+ *
+ **/
 
 inline void utf8_encode(const std::string& val, 
                    std::string& output, size_t& output_len) {
@@ -74,6 +79,9 @@ int main(int argc, char **argv) {
   std::getline(std::cin,range);
 
   boost::char_separator<char> sep(":");
+  /// the fix for spark1.2: removes '[' and ']'  
+  range.erase(std::remove(range.begin(), range.end(), '['), range.end());
+  range.erase(std::remove(range.begin(), range.end(), ']'), range.end());
   boost::tokenizer< boost::char_separator<char> > tok(range, sep);
   boost::tokenizer< boost::char_separator<char> >::iterator beg = tok.begin();
   
@@ -119,6 +127,7 @@ int main(int argc, char **argv) {
       python::object encoded_obj = python::object(base64.attr("b64encode")(pickle_dict));
       
       std::string stringPickle =  python::extract<std::string>(encoded_obj);
+      /// good for debugging 
       /*std::cout << stringPickle.length() << "\n";
       for (char c: stringPickle) {
         std::cout << int(c) << "\t";

@@ -138,15 +138,27 @@ class GraphTests(unittest.TestCase):
         g = SGraph()
         g = g.add_vertices(self.vertices, 'vid').add_edges(self.edges, 'src_id', 'dst_id')
         g2 = g.select_fields(["color", "weight"])
-        self.assertItemsEqual((g2.get_fields()), {'__id', '__src_id', '__dst_id', 'color', 'weight'})
+        self.assertSequenceEqual((g2.get_fields()), ['__id', 'color', '__src_id', '__dst_id', 'weight'])
         g2 = g.select_fields(["color"])
-        self.assertItemsEqual((g2.get_fields()), {'__id', '__src_id', '__dst_id', 'color'})
+        self.assertSequenceEqual((g2.get_fields()), ['__id', 'color', '__src_id', '__dst_id'])
         del g.edges['weight']
         del g.vertices['vec']
         g.vertices['color2'] = g.vertices['color']
-        self.assertItemsEqual((g.get_fields()), {'__id', '__src_id', '__dst_id', 'color', 'color2'})
+        self.assertSequenceEqual((g.get_fields()), ['__id', 'color', 'color2', '__src_id', '__dst_id'])
         g2 = g.select_fields([])
-        self.assertItemsEqual((g2.get_fields()), {'__id', '__src_id', '__dst_id'})
+        self.assertSequenceEqual((g2.get_fields()), ['__id', '__src_id', '__dst_id'])
+
+    def test_select_query_with_same_vertex_edge_field(self):
+        vertices = SFrame({'__id': range(10)})
+        edges = SFrame({'__src_id': range(10), '__dst_id': range(1, 11)})
+        g = SGraph(vertices, edges)
+        g.vertices['weight'] = 0
+        g.vertices['v'] = 0
+        g.edges['weight'] = 0
+        g.edges['e'] = 0
+        self.assertItemsEqual(g.get_fields(), ['v', 'e', 'weight', 'weight', '__id', '__src_id', '__dst_id'])
+        g2 = g.select_fields('weight')
+        self.assertItemsEqual(g2.get_fields(), ['weight', 'weight', '__id', '__src_id', '__dst_id'])
 
     def test_save_load(self):
         g = SGraph().add_vertices(self.vertices, 'vid').add_edges(self.edges, 'src_id', 'dst_id')
