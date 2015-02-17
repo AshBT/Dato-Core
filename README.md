@@ -45,7 +45,6 @@ is in the midst of a complete rearchitecting.
 
 Dependencies
 ------------
-
 GraphLab Create now automatically satisfied most dependencies. 
 There are however, a few dependencies which we cannot easily satisfy:
 
@@ -74,7 +73,7 @@ There are however, a few dependencies which we cannot easily satisfy:
 
 ### Satisfying Dependencies on Mac OS X
 
-Installing XCode 6 with the command line tools.
+Install XCode 6 with the command line tools.
 
 
 ### Satisfying Dependencies on Ubuntu
@@ -129,15 +128,17 @@ Running Unit Tests
 
 ### Running Python unit tests
 From the repo root:
-cd debug/src/unity/python/graphlab/test
-nosetests
+
+    cd debug/src/unity/python/graphlab/test
+    nosetests
 
 
 ### Running C++ units
 From the repo root:
-cd debug/test
-make
-ctest
+
+    cd debug/test
+    make
+    ctest
 
   
 Writing Your Own Apps
