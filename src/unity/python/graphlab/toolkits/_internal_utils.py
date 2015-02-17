@@ -209,7 +209,7 @@ def _raise_error_if_not_sframe(dataset, variable_name="SFrame"):
     Check if the input is an SFrame. Provide a proper error
     message otherwise.
     """
-    err_msg = "Input %s is not an SFrame. If it is a Pandas dataframe,"
+    err_msg = "Input %s is not an SFrame. If it is a Pandas DataFrame,"
     err_msg += " you may use the to_sframe() function to convert it to an SFrame."
 
     if not isinstance(dataset, _SFrame):

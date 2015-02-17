@@ -248,18 +248,18 @@ def launch_EC2(instance_type=DEFAULT_INSTANCE_TYPE, region=None, CIDR_rule=None,
             # So allow for a larger than normal number of ping failures. This is especially important when launching
             # in other AWS regions (since longer latency and longer download from S3 for engine binary)
             server.start(num_tolerable_ping_failures=120)
-    
+
         except Exception as e:
             __LOGGER__.error("Unable to successfully connect to GraphLab Server on EC2 instance: '%s'."
                          " Please check AWS Console to make sure any EC2 instances launched have"
                          " been terminated." % e)
             server.stop()
             raise e
-    
+
     except LicenseValidationException as e:
         # catch exception and print license check hint message here instead of raise
         __LOGGER__.info(e)
-        return 
+        return
     # Create the client
     num_tolerable_ping_failures = 3
     client = Client([], server.get_server_addr(), num_tolerable_ping_failures, public_key=client_public_key,
@@ -401,10 +401,10 @@ def _stop_instances(instance_id_list, region, credentials = {}):
         # Sanity check response.
         if(not(len(response) == len(instance_id_list))):
             raise Exception(ERROR_MSG)
-        for r in response:
-            status = r.update()
-            if status not in ['shutting-down', 'terminated']:
-                raise Exception(ERROR_MSG)
+
+         # it is possible the instances are still being terminated, but we do
+         # not need to wait for that now.
+        return
     except:
         raise Exception(ERROR_MSG)
 
@@ -422,7 +422,7 @@ def _ec2_factory(instance_type, region=None, availability_zone=None,
     if (not graphlab.product_key.is_product_key_valid(product_key)):
         raise LicenseValidationException("Product Key validation failed, please confirm your product key is correct.\
  If you believe this key to be valid, please contact support@dato.com")
-    
+
     # Set default values for parameters.
     if(region is None):
         region = _get_region_from_config()
@@ -499,14 +499,16 @@ def _ec2_factory(instance_type, region=None, availability_zone=None,
 
         try:
             # set specific timeout for this web service request, lots of time spent in SSL negotiation
-            graphlab_server_response = urllib2.urlopen(json_blob_url, timeout=10)
+            # for staging server allows a little more time
+            timeout_in_seconds = 10 if config.mode == 'PROD' else 60
+            graphlab_server_response = urllib2.urlopen(json_blob_url, timeout=timeout_in_seconds)
             json_blob = json.loads(graphlab_server_response.read())
         except:
             raise Exception('Unable to successfully retrieve correct EC2 image to launch for this '
                     'version. This could be a temporary problem. Please try again in a few '
                     'minutes. If the problem persists please contact support@dato.com')
         __LOGGER__.debug("web service return: %s" % json_blob)
-        
+
         if json_blob.get('error'):
             raise LicenseValidationException(json_blob.get('error'))
 
@@ -521,8 +523,8 @@ def _ec2_factory(instance_type, region=None, availability_zone=None,
     user_data['product_key'] = product_key
 
     user_data['hash_key'] = json_blob.get('hash_key', 'NO_HASH_VALUE')
-    
-    # Check for empty os_url 
+
+    # Check for empty os_url
     if user_data.get('os_url') is None or len(user_data.get('os_url')) == 0:
         user_data['os_url'] = 'NO_OS_URL'
 

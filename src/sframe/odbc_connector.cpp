@@ -199,10 +199,11 @@ void odbc_connector::init(const std::string &conn_str) {
   // Set up environment.  We want ODBC 3 behavior
   m_ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &m_env);
   if(m_ret == SQL_ERROR) {
-    log_and_throw("Unable to allocate ODBC environment handle!\n This is probably "
-        "because GraphLab Create is unable to find libodbc.{so,dylib}.\n Have you "
-        "installed an ODBC driver manager? If you have, supply\n the directory "
-        "to graphlab.set_libodbc_path().\n");
+    log_and_throw("Unable to allocate ODBC environment handle!\nThis is "
+        "probably because GraphLab Create cannot load libodbc.{so,dylib}.\n"
+        "Have you installed an ODBC driver manager? If you have, set the\n"
+        "directory to the GRAPHLAB_LIBODBC_PREFIX environment variable and\n"
+        "restart GraphLab Create.\n");
   }
   m_ret = SQLSetEnvAttr(m_env, SQL_ATTR_ODBC_VERSION, (void *)SQL_OV_ODBC3, 0);
   handle_return(m_ret, "SQLSetEnvAttr", m_env, SQL_HANDLE_ENV,

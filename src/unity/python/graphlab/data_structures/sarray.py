@@ -1,3 +1,11 @@
+"""
+This module defines the SArray class which provides the
+ability to create, access and manipulate a remote scalable array object.
+
+SArray acts similarly to pandas.Series but without indexing.
+The data is immutable, homogeneous, and is stored on the GraphLab Server side.
+"""
+
 '''
 Copyright (C) 2015 Dato, Inc.
 
@@ -14,19 +22,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
-"""
-This module defines the SArray class which provides the
-ability to create, access and manipulate a remote scalable array object.
 
-SArray acts similarly to pandas.Series but without indexing.
-The data is immutable, homogeneous, and is stored on the GraphLab Server side.
-"""
 import graphlab.connect as _mt
 import graphlab.connect.main as glconnect
 from graphlab.cython.cy_type_utils import pytype_from_dtype, infer_type_of_list, is_numeric_type
 from graphlab.cython.cy_sarray import UnitySArrayProxy
 from graphlab.cython.context import debug_trace as cython_context
-from graphlab.util import make_internal_url
+from graphlab.util import _make_internal_url
 import graphlab as gl
 import inspect
 import math
@@ -100,19 +102,214 @@ class SArray(object):
 
     Examples
     --------
+    SArray can be constructed in various ways:
+
+    Construct an SArray from list.
+
+    >>> from graphlab import SArray
     >>> sa = SArray(data=[1,2,3,4,5], dtype=int)
-    >>> sa = SArray('http://s3-us-west-2.amazonaws.com/testdatasets/a_to_z.txt.gz')
+
+    Construct an SArray from numpy.ndarray.
+
+    >>> sa = SArray(data=numpy.asarray([1,2,3,4,5]), dtype=int)
+    or:
+    >>> sa = SArray(numpy.asarray([1,2,3,4,5]), int)
+
+    Construct an SArray from pandas.Series.
+
+    >>> sa = SArray(data=pd.Series([1,2,3,4,5]), dtype=int)
+    or:
+    >>> sa = SArray(pd.Series([1,2,3,4,5]), int)
+
+    If the type is not specified, automatic inference is attempted:
+
+    >>> SArray(data=[1,2,3,4,5]).dtype()
+    int
+    >>> SArray(data=[1,2,3,4,5.0]).dtype()
+    float
+
+    The SArray supports standard datatypes such as: integer, float and string.
+    It also supports three higher level datatypes: float arrays, dict
+    and list (array of arbitrary types).
+
+    Create an SArray from a list of strings:
+
+    >>> sa = SArray(data=['a','b'])
+
+    Create an SArray from a list of float arrays;
+
     >>> sa = SArray([[1,2,3], [3,4,5]])
+
+    Create an SArray from a list of lists:
+
+    >>> sa = SArray(data=[['a', 1, {'work': 3}], [2, 2.0]])
+
+    Create an SArray from a list of dictionaries:
+
     >>> sa = SArray(data=[{'a':1, 'b': 2}, {'b':2, 'c': 1}])
+
+    Create an SArray from a list of datetime objects:
+
     >>> sa = SArray(data=[datetime.datetime(2011, 10, 20, 9, 30, 10)])
 
-    Working with a GraphLab EC2 instance:
-    >>> graphlab.aws.launch_EC2('m1.large')
-    >>> sa = SArray('~/mydata/foo.csv')          # throws exception
-    >>> sa = SArray('remote:///mydata/foo.csv')  # works
-    >>> sa = SArray("http://testdatasets.s3-website-us-west-2.amazonaws.com/users.csv.gz") # works
-    >>> sa = SArray("s3://mybucket/foo.csv") # works
-    >>> graphlab.aws.terminate_EC2()
+    Construct an SArray from local text file. (Only works for local server).
+
+    >>> sa = SArray('/tmp/a_to_z.txt.gz')
+
+    Construct an SArray from a text file downloaded from a URL.
+
+    >>> sa = SArray('http://s3-us-west-2.amazonaws.com/testdatasets/a_to_z.txt.gz')
+
+    **Numeric Operators**
+
+    SArrays support a large number of vectorized operations on numeric types.
+    For instance:
+
+    >>> sa = SArray([1,1,1,1,1])
+    >>> sb = SArray([2,2,2,2,2])
+    >>> sc = sa + sb
+    >>> sc
+    dtype: int
+    Rows: 5
+    [3, 3, 3, 3, 3]
+    >>> sc + 2
+    dtype: int
+    Rows: 5
+    [5, 5, 5, 5, 5]
+
+    Operators which are supported include all numeric operators (+,-,*,/), as
+    well as comparison operators (>, >=, <, <=), and logical operators (&, |).
+
+    For instance:
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> (sa >= 2) & (sa <= 4)
+    dtype: int
+    Rows: 5
+    [0, 1, 1, 1, 0]
+
+    The numeric operators (+,-,*,/) also work on array types:
+
+    >>> sa = SArray(data=[[1.0,1.0], [2.0,2.0]])
+    >>> sa + 1
+    dtype: list
+    Rows: 2
+    [array('f', [2.0, 2.0]), array('f', [3.0, 3.0])]
+    >>> sa + sa
+    dtype: list
+    Rows: 2
+    [array('f', [2.0, 2.0]), array('f', [4.0, 4.0])]
+
+    The addition operator (+) can also be used for string concatenation:
+
+    >>> sa = SArray(data=['a','b'])
+    >>> sa + "x"
+    dtype: str
+    Rows: 2
+    ['ax', 'bx']
+
+    This can be useful for performing type interpretation of lists or
+    dictionaries stored as strings:
+
+    >>> sa = SArray(data=['a,b','c,d'])
+    >>> ("[" + sa + "]").astype(list) # adding brackets make it look like a list
+    dtype: list
+    Rows: 2
+    [['a', 'b'], ['c', 'd']]
+
+    All comparison operations and boolean operators are supported and emit
+    binary SArrays.
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> sa >= 2
+    dtype: int
+    Rows: 3
+    [0, 1, 1, 1, 1]
+    >>> (sa >= 2) & (sa <= 4)
+    dtype: int
+    Rows: 3
+    [0, 1, 1, 1, 0]
+
+
+    **Element Access and Slicing**
+    SArrays can be accessed by integer keys just like a regular python list.
+    Such operations may not be fast on large datasets so looping over an SArray
+    should be avoided.
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> sa[0]
+    1
+    >>> sa[2]
+    3
+    >>> sa[5]
+    IndexError: SFrame index out of range
+
+    Negative indices can be used to access elements from the tail of the array
+
+    >>> sa[-1] # returns the last element
+    5
+    >>> sa[-2] # returns the second to last element
+    4
+
+    The SArray also supports the full range of python slicing operators:
+
+    >>> sa[1000:] # Returns an SArray containing rows 1000 to the end
+    >>> sa[:1000] # Returns an SArray containing rows 0 to row 999 inclusive
+    >>> sa[0:1000:2] # Returns an SArray containing rows 0 to row 1000 in steps of 2
+    >>> sa[-100:] # Returns an SArray containing last 100 rows
+    >>> sa[-100:len(sa):2] # Returns an SArray containing last 100 rows in steps of 2
+
+    **Logical Filter**
+
+    An SArray can be filtered using
+
+    >>> array[binary_filter]
+
+    where array and binary_filter are SArrays of the same length. The result is
+    a new SArray which contains only elements of 'array' where its matching row
+    in the binary_filter is non zero.
+
+    This permits the use of boolean operators that can be used to perform
+    logical filtering operations.  For instance:
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> sa[(sa >= 2) & (sa <= 4)]
+    dtype: int
+    Rows: 3
+    [2, 3, 4]
+
+    This can also be used more generally to provide filtering capability which
+    is otherwise not expressible with simple boolean functions. For instance:
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> sa[sa.apply(lambda x: math.log(x) <= 1)]
+    dtype: int
+    Rows: 3
+    [1, 2]
+
+    This is equivalent to
+
+    >>> sa.filter(lambda x: math.log(x) <= 1)
+    dtype: int
+    Rows: 3
+    [1, 2]
+
+    **Iteration**
+
+    The SArray is also iterable, but not efficiently since this involves a
+    streaming transmission of data from the server to the client. This should
+    not be used for large data.
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> [i + 1 for i in sa]
+    [2, 3, 4, 5, 6]
+
+    This can be used to convert an SArray to a list:
+
+    >>> sa = SArray([1,2,3,4,5])
+    >>> l = list(sa)
+    >>> l
+    [1, 2, 3, 4, 5]
     """
 
     def __init__(self, data=[], dtype=None, ignore_cast_failure=False, _proxy=None):
@@ -173,7 +370,7 @@ class SArray(object):
                 with cython_context():
                     self.__proxy__.load_from_iterable(data, dtype, ignore_cast_failure)
             elif (isinstance(data, str) or isinstance(data, unicode)):
-                internal_url = make_internal_url(data)
+                internal_url = _make_internal_url(data)
                 with cython_context():
                     self.__proxy__.load_autodetect(internal_url, dtype)
             else:
@@ -211,17 +408,25 @@ class SArray(object):
         """
         from_sequence(start=0, stop)
 
-        >>> from_sequence(1000)
-        Construct an SArray of integer values from 0 to 999
+        Create an SArray from sequence
 
-        This is equivalent, but more efficient than:
-        >>> gl.SArray(range(1000))
+        .. sourcecode:: python
 
-        >>> from_sequence(10, 1000)
-        Construct an SArray of integer values from 10 to 999
+            Construct an SArray of integer values from 0 to 999
 
-        This is equivalent, but more efficient than:
-        >>> gl.SArray(range(10, 1000))
+            >>> gl.SArray.from_sequence(1000)
+
+            This is equivalent, but more efficient than:
+
+            >>> gl.SArray(range(1000))
+
+            Construct an SArray of integer values from 10 to 999
+
+            >>> gl.SArray.from_sequence(10, 1000)
+
+            This is equivalent, but more efficient than:
+
+            >>> gl.SArray(range(10, 1000))
 
         Parameters
         ----------
@@ -324,11 +529,14 @@ class SArray(object):
                 format = 'binary'
         if format == 'binary':
             with cython_context():
-                self.__proxy__.save(make_internal_url(filename))
+                self.__proxy__.save(_make_internal_url(filename))
         elif format == 'text':
             sf = gl.SFrame({'X1':self})
             with cython_context():
-                sf.__proxy__.save_as_csv(make_internal_url(filename), {'header':False})
+                sf.__proxy__.save_as_csv(_make_internal_url(filename), {'header':False})
+
+    def _escape_space(self,s):
+            return "".join([ch.encode('string_escape') if ch.isspace() else ch for ch in s])
 
     def __repr__(self):
         """
@@ -336,7 +544,7 @@ class SArray(object):
         """
         ret = "dtype: " + str(self.dtype().__name__) + "\n"
         ret = ret + "Rows: " + str(self.size()) + "\n"
-        ret = ret + str(self)
+        ret = ret + self.__str__()
         return ret
 
     def __str__(self):
@@ -348,7 +556,8 @@ class SArray(object):
         if self.dtype() == gl.data_structures.image.Image:
             headln = str(list(self._head_str(100)))
         else:
-            headln = str(list(self.head(100)))
+            headln = self._escape_space(str(list(self.head(100))))
+            headln = unicode(headln.decode('string_escape'),'utf-8',errors='replace').encode('utf-8')
         if (self.size() > 100):
             # cut the last close bracket
             # and replace it with ...

@@ -7,7 +7,7 @@ ExternalProject_Add(eigen
   BUILD_IN_SOURCE 1
   INSTALL_COMMAND cp -r Eigen unsupported <INSTALL_DIR>/
   INSTALL_DIR ${CMAKE_SOURCE_DIR}/deps/local/include)
-add_definitions(-DHAS_EIGEN)
+add_definitions(-DHAS_EIGEN -DEIGEN_DONT_PARALLELIZE)
 
 macro(requires_eigen NAME)
   add_dependencies(${NAME} eigen)

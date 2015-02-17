@@ -30,6 +30,7 @@ import threading
 import uuid
 import copy as _copy
 import requests as _requests
+import sys
 import urllib as _urllib
 
 # product key
@@ -214,6 +215,7 @@ class _MetricsWorkerThread(threading.Thread):
     self._sys_info['python_implementation'] = platform.python_implementation()
     self._sys_info['python_version'] = platform.python_version()
     self._sys_info['python_build'] = self._tup_to_flat_str(platform.python_build())
+    self._sys_info['python_executable'] = sys.executable
 
     # Get architecture info
     self._sys_info['architecture'] = self._tup_to_flat_str(platform.architecture())

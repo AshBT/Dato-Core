@@ -1,3 +1,7 @@
+"""
+Efficiently compute the approximate statistics over an SArray.
+"""
+
 '''
 Copyright (C) 2015 Dato, Inc.
 

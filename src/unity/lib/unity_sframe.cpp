@@ -96,6 +96,8 @@ void unity_sframe::construct_from_sframe_index(std::string location) {
     auto sframe_ptr = std::make_shared<sframe>(prefix + ".frame_idx");
     m_lazy_sframe = std::make_shared<lazy_sframe>(sframe_ptr);
     dirarc.close();
+  } else if(status == fileio::file_status::FS_UNAVAILABLE) {
+    log_and_throw_io_failure("Cannot read from filesystem. Check log for details.");
   }
 }
 

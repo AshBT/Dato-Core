@@ -17,6 +17,9 @@
 // libhdfs shim library
 #include <globals/global_constants.hpp>
 #include <logger/logger.hpp>
+#include <logger/assertions.hpp>
+#include <vector>
+#include <string>
 #ifdef HAS_HADOOP
 #include <dlfcn.h>
 extern  "C" {
@@ -71,32 +74,47 @@ extern  "C" {
     static bool shim_attempted = false;
     if (shim_attempted == false) {
       shim_attempted = true;
-        // find one in the unity_server directory
-        std::string main_path =
-            graphlab::GLOBALS_MAIN_PROCESS_PATH + "/libhdfs.so";
-        logstream(LOG_INFO) << "Trying " << main_path << std::endl;
-        libhdfs_handle = dlopen(main_path.c_str(), RTLD_NOW | RTLD_LOCAL);
+      const char *err_msg;
 
-      if (libhdfs_handle == NULL) {
-        // failed. find one in the local directory
-        logstream(LOG_INFO) << "Trying ./libhdfs.so" << std::endl;
-        libhdfs_handle = dlopen("./libhdfs.so", RTLD_NOW | RTLD_LOCAL);
-      }
-      if (libhdfs_handle == NULL) {
+      std::vector<std::string> potential_paths = {
+        // find one in the unity_server directory
+        graphlab::GLOBALS_MAIN_PROCESS_PATH + "/libhdfs.so",
+        // find one in the local directory
+        "./libhdfs.so",
         // special handling for internal build path locations
-        std::string main_path =
-            graphlab::GLOBALS_MAIN_PROCESS_PATH + "/../../../../deps/local/lib/libhdfs.so";
-        logstream(LOG_INFO) << "Trying " << main_path << std::endl;
-        libhdfs_handle = dlopen(main_path.c_str(), RTLD_NOW | RTLD_LOCAL);
+        graphlab::GLOBALS_MAIN_PROCESS_PATH + "/../../../../deps/local/lib/libhdfs.so",
+        // find a global libhdfs.so
+        "libhdfs.so",
+      };
+
+      // We don't want to freak customers out with failure messages as we try
+      // to load these libraries.  There's going to be a few in the normal
+      // case. Print them if we really didn't find libhdfs.so.
+      std::vector<std::string> error_messages;
+
+      for(auto &i : potential_paths) {
+        logstream(LOG_INFO) << "Trying " << i << std::endl;
+        libhdfs_handle = dlopen(i.c_str(), RTLD_NOW | RTLD_LOCAL);
+
+        if(libhdfs_handle != NULL) {
+          logstream(LOG_INFO) << "Success!" << std::endl;
+          break;
+        } else {
+          err_msg = dlerror();
+          if(err_msg != NULL) {
+            error_messages.push_back(std::string(err_msg));
+          } else {
+            error_messages.push_back(std::string("dlerror returned NULL"));
+          }
+        }
       }
-      if (libhdfs_handle == NULL) {
-              // find a global libhdfs.so
-        logstream(LOG_INFO) << "Trying global libhdfs.so" << std::endl;
-        libhdfs_handle = dlopen("libhdfs.so", RTLD_NOW | RTLD_LOCAL);
-      }
+
       if (libhdfs_handle == NULL) {
         logstream(LOG_INFO) << "Unable to load libhdfs.so" << std::endl;
         dlopen_fail = true;
+        for(size_t i = 0; i < potential_paths.size(); ++i) {
+          logstream(LOG_INFO) << error_messages[i] << std::endl;
+        }
       }
     }
   }

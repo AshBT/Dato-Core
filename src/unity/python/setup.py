@@ -107,7 +107,7 @@ class InstallEngine(install):
             file_util.move_file(psutil_file, os.path.join(root_path, '..', 'graphlab_psutil'))
 
         # make sure all of our binaries are executable to all
-        packaged_binaries = ['unity_server', 'pylambda_worker', 'sftordd_pickle', 'rddtosf_pickle', 'rddtosf_nonpickle']
+        packaged_binaries = ['unity_server', 'pylambda_worker', 'sftordd_pickle', 'rddtosf_pickle', 'rddtosf_nonpickle', 'spark_pipe_wrapper']
         packaged_binary_paths = []
         for exe_name in packaged_binaries:
             exe_path = os.path.join(root_path, exe_name)
@@ -158,13 +158,13 @@ if __name__ == '__main__':
                      'canvas/webapp/js/*.js', 'canvas/webapp/images/*.png', 'cython/*.so', 'id',
                      'toolkits/deeplearning/*.conf',
                      'unity_server', 'pylambda_worker', 'rddtosf_nonpickle', 'sftordd_pickle',
-                     'rddtosf_pickle', 'libhdfs.so', 'graphlab-create-spark-integration.jar', 'linux/cython/*.so',
+                     'rddtosf_pickle', 'spark_pipe_wrapper', 'libhdfs.so', 'graphlab-create-spark-integration.jar', 'linux/cython/*.so',
                      'linux/pylambda_worker', 'linux/unity_server', 'linux/libhdfs.so',
-                     'linux/sftordd_pickle', 'linux/rddtosf_nonpickle', 'linux/rddtosf_pickle',
+                     'linux/sftordd_pickle', 'linux/rddtosf_nonpickle', 'linux/rddtosf_pickle', 'linux/spark_pipe_wrapper',
                      'linux/graphlab-create-spark-integration.jar',
                      'linux/_psutil*.so',
                      'osx/cython/*.so', 'osx/unity_server', 'osx/pylambda_worker',
-                     'osx/rddtosf_nonpickle', 'osx/rddtosf_pickle', 'osx/sftordd_pickle',
+                     'osx/rddtosf_nonpickle', 'osx/rddtosf_pickle', 'osx/spark_pipe_wrapper', 'osx/sftordd_pickle',
                      'osx/libhdfs.so', 'osx/graphlab-create-spark-integration.jar', 'osx/_psutil*.so', 'deploy/*.jar', 'lua/pl/*.lua',
                      'canvas/webapp/css/bootstrap/*.css',
                      'canvas/webapp/css/bootstrap/LICENSE',
@@ -235,6 +235,7 @@ if __name__ == '__main__':
             "tornado == 3.2.1",
             "prettytable == 0.7.2",
             "requests == 2.3.0",
-            "awscli == 1.6.2"
+            "awscli == 1.6.2",
+            "lockfile == 0.10.2"
         ],
     )

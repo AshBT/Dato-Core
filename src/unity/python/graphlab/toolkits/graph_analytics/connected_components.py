@@ -38,7 +38,7 @@ def get_default_options():
 
 class ConnectedComponentsModel(_ModelBase):
     r"""
-    A ConnectedComponentsModel object contains the component ID for each vertex 
+    A ConnectedComponentsModel object contains the component ID for each vertex
     and the total number of weakly connected components in the graph.
 
     A weakly connected component is a maximal set of vertices such that there
@@ -58,9 +58,9 @@ class ConnectedComponentsModel(_ModelBase):
     | component_id   | An SFrame with each vertex's component id           |
     +----------------+-----------------------------------------------------+
 
-    This model cannot be constructed directly.  Instead, use 
+    This model cannot be constructed directly.  Instead, use
     :func:`graphlab.connected_components.create` to create an instance
-    of this model. A detailed list of parameter options and code samples 
+    of this model. A detailed list of parameter options and code samples
     are available in the documentation for the create function.
 
     See Also
@@ -121,6 +121,14 @@ def create(graph, verbose=True):
     id`` corresponding to each vertex as follows:
 
     >>> cc_graph = cc['graph']      # SGraph
+
+    We can add the new component_id field to the original graph g using:
+
+    >>> g.vertices['component_id'] = cc['graph'].vertices['component_id']
+
+    Note that the task above does not require a join because the vertex
+    ordering is preserved through ``create()``.
+
 
     See Also
     --------

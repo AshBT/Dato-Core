@@ -364,8 +364,8 @@ unity_sgraph::rename_vertex_fields(const std::vector<std::string>& oldnames,
 std::shared_ptr<unity_sgraph_base> unity_sgraph::select_vertex_fields(
     const std::vector<std::string>& fields, size_t group) {
   log_func_entry();
-  std::vector<std::string> fields_with_id(fields);
-  fields_with_id.push_back(sgraph::VID_COLUMN_NAME);
+  std::vector<std::string> fields_with_id({sgraph::VID_COLUMN_NAME});
+  fields_with_id.insert(fields_with_id.end(), fields.begin(), fields.end());
   std::shared_ptr<unity_sgraph> g(new unity_sgraph(*this));
   g->m_graph.reset(unity_sgraph::get_dag()->add_operation(
         new select_vertex_fields_op(fields_with_id, group), {m_graph.get()}));
@@ -454,9 +454,8 @@ std::shared_ptr<unity_sgraph_base>
 unity_sgraph::select_edge_fields(const std::vector<std::string>& fields,
                                  size_t groupa, size_t groupb) {
   log_func_entry();
-  std::vector<std::string> fields_with_id(fields);
-  fields_with_id.push_back(sgraph::SRC_COLUMN_NAME);
-  fields_with_id.push_back(sgraph::DST_COLUMN_NAME);
+  std::vector<std::string> fields_with_id({sgraph::SRC_COLUMN_NAME, sgraph::DST_COLUMN_NAME});
+  fields_with_id.insert(fields_with_id.end(), fields.begin(), fields.end());
   std::shared_ptr<unity_sgraph> g(new unity_sgraph(*this));
   g->m_graph.reset(unity_sgraph::get_dag()->add_operation(
         new select_edge_fields_op(fields_with_id, groupa, groupb),

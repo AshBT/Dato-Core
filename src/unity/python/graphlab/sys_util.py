@@ -66,6 +66,9 @@ def make_unity_server_env():
     # to all packeages installed inside virtualenv.
     if 'PYTHONEXECUTABLE' in env:
         del env['PYTHONEXECUTABLE']
+
+    ## set local to be c standard so that unity_server will run ##
+    env['LC_ALL']='C'
     return env
 
 
@@ -90,30 +93,48 @@ def get_libjvm_path():
     if cur_platform.startswith("macosx"):
         return ''
     else:
-        potential_paths = [
-                '/usr/lib/jvm/default-java/jre/lib/amd64/server',               # ubuntu / debian distros
-                '/usr/lib/jvm/java/jre/lib/amd64/server',                       # rhel6
-                '/usr/lib/jvm/jre/lib/amd64/server',                            # centos6
-                '/usr/lib64/jvm/jre/lib/amd64/server',                          # opensuse 13
-                '/usr/local/lib/jvm/default-java/jre/lib/amd64/server',         # alt ubuntu / debian distros
-                '/usr/local/lib/jvm/java/jre/lib/amd64/server',                 # alt rhel6
-                '/usr/local/lib/jvm/jre/lib/amd64/server',                      # alt centos6
-                '/usr/local/lib64/jvm/jre/lib/amd64/server',                    # alt opensuse 13
-                '/usr/local/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server', # alt ubuntu / debian distros
-                '/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server',       # alt ubuntu / debian distros
-                '/usr/local/lib/jvm/java-6-openjdk-amd64/jre/lib/amd64/server', # alt ubuntu / debian distros
-                '/usr/lib/jvm/java-6-openjdk-amd64/jre/lib/amd64/server',       # alt ubuntu / debian distros
-                '/usr/lib/jvm/java-7-oracle/jre/lib/amd64/server',              # alt ubuntu
-                '/usr/lib/jvm/java-8-oracle/jre/lib/amd64/server',              # alt ubuntu
-                '/usr/lib/jvm/java-6-oracle/jre/lib/amd64/server',              # alt ubuntu
-                '/usr/local/lib/jvm/java-7-oracle/jre/lib/amd64/server',        # alt ubuntu
-                '/usr/local/lib/jvm/java-8-oracle/jre/lib/amd64/server',        # alt ubuntu
-                '/usr/local/lib/jvm/java-6-oracle/jre/lib/amd64/server',        # alt ubuntu
+        path_suffix = '/jre/lib/amd64/server'
+        path_prefixes = [
+                '/usr/lib/jvm/default-java',               # ubuntu / debian distros
+                '/usr/lib/jvm/java',                       # rhel6
+                '/usr/lib/jvm',                            # centos6
+                '/usr/lib64/jvm',                          # opensuse 13
+                '/usr/local/lib/jvm/default-java',         # alt ubuntu / debian distros
+                '/usr/local/lib/jvm/java',                 # alt rhel6
+                '/usr/local/lib/jvm',                      # alt centos6
+                '/usr/local/lib64/jvm',                    # alt opensuse 13
+                '/usr/local/lib/jvm/java-7-openjdk-amd64', # alt ubuntu / debian distros
+                '/usr/lib/jvm/java-7-openjdk-amd64',       # alt ubuntu / debian distros
+                '/usr/local/lib/jvm/java-6-openjdk-amd64', # alt ubuntu / debian distros
+                '/usr/lib/jvm/java-6-openjdk-amd64',       # alt ubuntu / debian distros
+                '/usr/lib/jvm/java-7-oracle',              # alt ubuntu
+                '/usr/lib/jvm/java-8-oracle',              # alt ubuntu
+                '/usr/lib/jvm/java-6-oracle',              # alt ubuntu
+                '/usr/local/lib/jvm/java-7-oracle',        # alt ubuntu
+                '/usr/local/lib/jvm/java-8-oracle',        # alt ubuntu
+                '/usr/local/lib/jvm/java-6-oracle',        # alt ubuntu
+                '/usr/lib/jvm/default',                    # alt centos
+                '/usr/java/latest',                        # alt centos
                 ]
+
+        # First check GRAPHLAB_LIBJVM_DIRECTORY which is expected to be a
+        # directory that libjvm.so resides (the path_suffix will not be used)
+        # Then, check GRAPHLAB_JAVA_HOME, which will override JAVA_HOME.
+        if os.environ.has_key('JAVA_HOME'):
+            path_prefixes.insert(0, os.environ['JAVA_HOME'])
+        if os.environ.has_key('GRAPHLAB_JAVA_HOME'):
+            path_prefixes.insert(0, os.environ['GRAPHLAB_JAVA_HOME'])
+        potential_paths = [i + path_suffix for i in path_prefixes]
+        if os.environ.has_key('GRAPHLAB_LIBJVM_DIRECTORY'):
+            potential_paths.insert(0, os.environ['GRAPHLAB_LIBJVM_DIRECTORY'])
         for path in potential_paths:
             if os.path.isfile(os.path.join(path, 'libjvm.so')):
                 logging.getLogger(__name__).debug('libjvm.so path used: %s' % path)
                 return path
+        logging.getLogger(__name__).warning('libjvm.so not found. Operations '
+        'using HDFS may not work.\nSet GRAPHLAB_JAVA_HOME environment variable'
+        ' before starting GraphLab Create to specify preferred java '
+        'installation.')
         return ''
 
 

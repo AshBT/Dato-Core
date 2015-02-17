@@ -52,13 +52,13 @@ class PagerankModel(_ModelBase):
 
     where :math:`N(i)` is the set containing all vertices :math:`j` such that
     there is an edge going from :math:`j` to :math:`i`. Self edges (i.e., edges
-    where the source vertex is the same as the destination vertex) and repeated 
-    edges (i.e., multiple edges where the source vertices are the same and the 
-    destination vertices are the same) are treated like normal edges in the 
+    where the source vertex is the same as the destination vertex) and repeated
+    edges (i.e., multiple edges where the source vertices are the same and the
+    destination vertices are the same) are treated like normal edges in the
     above recursion.
 
-    Currently, edge weights are not taken into account when computing the 
-    PageRank.  
+    Currently, edge weights are not taken into account when computing the
+    PageRank.
 
     Below is a list of queryable fields for this model:
 
@@ -83,9 +83,9 @@ class PagerankModel(_ModelBase):
     | max_iterations    | The maximun number of iterations to run                   |
     +-------------------+-----------------------------------------------------------+
 
-    This model cannot be constructed directly.  Instead, use 
+    This model cannot be constructed directly.  Instead, use
     :func:`graphlab.pagerank.create` to create an instance
-    of this model. A detailed list of parameter options and code samples 
+    of this model. A detailed list of parameter options and code samples
     are available in the documentation for the create function.
 
     See Also
@@ -165,6 +165,13 @@ def create(graph, reset_probability=0.15,
     using:
 
     >>> pr_out = pr['pagerank']     # SFrame
+
+    We can add the new pagerank field to the original graph g using:
+
+    >>> g.vertices['pagerank'] = pr['graph'].vertices['pagerank']
+
+    Note that the task above does not require a join because the vertex
+    ordering is preserved through ``create()``.
 
     See Also
     --------

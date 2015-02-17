@@ -725,7 +725,7 @@ inline void pack(
           } else if (dtype == flex_type_enum::VECTOR) {
             flex_vec out_val;
             for (size_t col = 0; col < num_cols; col++) {
-              if (items[col][row] != FLEX_UNDEFINED && !std::isnan(items[col][row].get<flex_float>())) {
+              if (!items[col][row].is_na()) {
                 out_val.push_back((double)items[col][row]);
               } else {
                 if (fill_na == FLEX_UNDEFINED) {
@@ -758,7 +758,7 @@ inline void pack(
  * columns based on elements. Each element maps to one column in output
  *
  * \param input The input SArray to read from
- * \param elements Specify the elements from the datetime to expand 
+ * \param elements Specify the elements from the datetime to expand
  * \param output The sframe to write to
  */
 inline void expand(
@@ -775,7 +775,7 @@ inline void expand(
 
   flex_type_enum dtype = input->get_type();
   ASSERT_TRUE(dtype == flex_type_enum::DATETIME);
-  // get input iterators 
+  // get input iterators
   auto input_iterator = input->get_iterator(dop);
 
   parallel_for(0, dop,
@@ -796,14 +796,14 @@ inline void expand(
             }
           } else {
 
-              for(size_t i = 0; i < num_cols; i++) { 
+              for(size_t i = 0; i < num_cols; i++) {
                 const flex_date_time & dt = val.get<flex_date_time>();
                 boost::posix_time::ptime ptime_val = flexible_type_impl::my_from_time_t(dt.first + (dt.second * 1800));
-                tm _tm = boost::posix_time::to_tm(ptime_val); 
+                tm _tm = boost::posix_time::to_tm(ptime_val);
                 if(elements[i] == "year")
                     row[i] = _tm.tm_year + 1900;
                 else if(elements[i] == "month")
-                    row[i] = _tm.tm_mon + 1; // +1 is for adjustment with datetime object in python,tm is from 0-11 while datetime is from 1-12 
+                    row[i] = _tm.tm_mon + 1; // +1 is for adjustment with datetime object in python,tm is from 0-11 while datetime is from 1-12
                 else if(elements[i] == "day")
                     row[i] = _tm.tm_mday;
                 else if(elements[i] == "hour")
@@ -813,7 +813,7 @@ inline void expand(
                 else if(elements[i] == "second")
                     row[i] = _tm.tm_sec;
                 else if(elements[i] == "tzone")
-                    row[i] = dt.second/2.0; // we store half an hour in the datetime timezone offset. 
+                    row[i] = dt.second/2.0; // we store half an hour in the datetime timezone offset.
               }
           }
 

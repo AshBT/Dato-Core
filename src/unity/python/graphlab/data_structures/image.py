@@ -72,7 +72,7 @@ class Image(object):
         self._format_enum = _format[_UNDEFINED]
 
         if (path is not None):
-            from graphlab.util import make_internal_url as _make_internal_url
+            from graphlab.util import _make_internal_url
             import graphlab.extensions as _extensions
             img = _extensions.load_image(_make_internal_url(path), format)
             for key, value in img.__dict__.iteritems():

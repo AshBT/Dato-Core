@@ -235,7 +235,7 @@ class sgraph {
   /**
    * Subselect fields in the vertex sframe.
    */
-  bool select_vertex_fields(const std::set<std::string>& fields, size_t group = 0);
+  bool select_vertex_fields(const std::vector<std::string>& fields, size_t group = 0);
 
   /**
    * Deletes a field from edge data. Returns true on success.
@@ -252,7 +252,7 @@ class sgraph {
   /**
    * Subselect fields in the edge sframe.
    */
-  bool select_edge_fields(const std::set<std::string>& fields, size_t groupa = 0, size_t groupb = 0);
+  bool select_edge_fields(const std::vector<std::string>& fields, size_t groupa = 0, size_t groupb = 0);
 
   /**
    * Resets the graph 

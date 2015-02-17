@@ -1,75 +1,57 @@
-.. _data_structures
+.. _data_structures:
 
-###############
-Data structures
-###############
-
-
+################
+Data Engineering
+################
 .. automodule:: graphlab.data_structures
   :members:
 
-
 .. currentmodule:: graphlab
 
-Edge
-----
+
+Scalable Data Structure
+-----------------------
 .. autosummary::
   :toctree: generated/
-
-  Edge
-
-Image
------
-.. autosummary::
-  :toctree: generated/
-
-  Image
-
-SArray
-------
-.. autosummary::
-  :toctree: generated/
+  :nosignatures:
 
   SArray
-
-SFrame
-------
-.. autosummary::
-  :toctree: generated/
-
   SFrame
-  
-SGraph
-------
-.. autosummary::
-  :toctree: generated/
-
   SGraph
 
-Sketch
-------
+
+Summarization
+-------------
 .. autosummary::
   :toctree: generated/
+  :nosignatures:
 
   Sketch
 
-Vertex
-------
+Aggregation
+-----------
+.. toctree::
+  :maxdepth: 2
+
+  graphlab.data_structures.aggregation
+
+
+Connectors
+----------
+.. toctree::
+  :maxdepth: 2
+
+  graphlab.data_structures.connectors
+
+
+Utilities
+---------
 .. autosummary::
   :toctree: generated/
+  :nosignatures:
 
-  Vertex
-
-Methods
--------
-.. autosummary::
-  :toctree: generated/
-
+  SFrame.save
+  SArray.save
+  SGraph.save
   load_sgraph
   load_sframe  
-  connect_odbc
-
-Groupby Aggregators
--------------------
-.. automodule:: graphlab.aggregate
-  :members:

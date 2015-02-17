@@ -75,6 +75,7 @@ static bool stop_memory_release_thread = false;
 graphlab::mutex memory_release_lock;
 graphlab::conditional memory_release_cond;
 
+
 void memory_release_loop() {
   memory_release_lock.lock();
   while (!stop_memory_release_thread) {
@@ -84,6 +85,9 @@ void memory_release_loop() {
   memory_release_lock.unlock();
 }
 #endif
+
+std::string SERVER_LOG_FILE;
+REGISTER_GLOBAL(std::string, SERVER_LOG_FILE, false);
 
 // Global variables 
 graphlab::toolkit_function_registry* g_toolkit_functions;
@@ -341,6 +345,7 @@ int main(int argc, char** argv) {
       global_logger().set_log_file(log_file);
     }
   }
+  SERVER_LOG_FILE = log_file;
 
   graphlab::reap_unused_temp_files();
 

@@ -75,7 +75,7 @@ bool csv_line_tokenizer::tokenize_line(const char* str, size_t len,
                       if ((*buf) != prevbuf) {
                         // take the parsed section and turn it into a string
                         std::string v = std::string(prevbuf, ((*buf) - prevbuf));
-                        output.push_back(std::string(v, v.length()));
+                        output.push_back(std::move(v));
                         return true;
                       }
                       return false;
@@ -217,7 +217,8 @@ bool csv_line_tokenizer::parse_as(const char** buf, size_t len, flexible_type& o
 
 // insert a character into the field buffer. resizing it if necessary
 #define PUSH_CHAR(c) if (field_buffer_len >= field_buffer.size()) field_buffer.resize(field_buffer.size() * 2); \
-                     field_buffer[field_buffer_len++] = c; 
+                     field_buffer[field_buffer_len++] = c;  \
+                     escape_sequence = (c == escape_char);
 
 // Finished parsing a field buffer. insert the token and reset the buffer
 #define END_FIELD() if (!add_token(&(field_buffer[0]), field_buffer_len)) { good = false; keep_parsing = false; break; } \
@@ -260,6 +261,9 @@ bool csv_line_tokenizer::tokenize_line_impl(const char* str,
   bool keep_parsing = true;
   // we switched state to start_field by encountering a delimiter
   bool start_field_with_delimiter_encountered = false;
+  // this is set to true for the character immediately after an escape character
+  // and false all other times
+  bool escape_sequence = false;
   tokenizer_state state = tokenizer_state::START_FIELD; 
   field_buffer_len = 0;
   if (delimiter_is_new_line) {
@@ -272,6 +276,10 @@ bool csv_line_tokenizer::tokenize_line_impl(const char* str,
   while(keep_parsing && buf != bufend) {
     // Next character in file
     bool is_delimiter = DELIMITER_TEST();
+    // since escape_sequence can only be true for one character after it is
+    // set to true. I need a flag here. if reset_escape_sequence is true, the
+    // at the end of the loop, I clear escape_sequence
+    bool reset_escape_sequence = escape_sequence;
     // skip to the last character of the delimiter
     if (is_delimiter) buf += delimiter.length() - 1;
 
@@ -369,7 +377,7 @@ REGULAR_CHARACTER:
 
      case tokenizer_state::IN_QUOTED_FIELD:
        /* in quoted field */
-       if (c == quote_char) {
+       if (c == quote_char && !escape_sequence) {
          if (double_quote) {
            /* doublequote; " represented by "" */
            // look ahead one character
@@ -389,6 +397,7 @@ REGULAR_CHARACTER:
        }
        break;
     }
+    if (reset_escape_sequence) escape_sequence = false;
   }
   if (!good) return false;
   // cleanup 

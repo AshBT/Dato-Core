@@ -32,17 +32,19 @@ from graphlab.connect.aws._ec2 import get_credentials as _get_aws_credentials
 import graphlab.connect as _mt
 import graphlab.connect.main as _glconnect
 import graphlab.connect.server as _server
-import graphlab.version_info
+import graphlab.version_info as _version_info
 import graphlab.sys_util as _sys_util
-from pkg_resources import parse_version
-
+from pkg_resources import parse_version as _parse_version
+import _gl_pickle as gl_pickle
+import graphlab as _gl
 import logging as _logging
 
 __LOGGER__ = _logging.getLogger(__name__)
 
+
 def _check_canvas_enabled(func):
     def error(*args, **kwargs):
-        print 'This functionality is not available in GraphLab Create Open Source.' 
+        print 'This functionality is not available in GraphLab Create Open Source.'
 
     # Is canvas available?
     try:
@@ -51,6 +53,7 @@ def _check_canvas_enabled(func):
         return error
 
     return func
+
 
 def _try_inject_s3_credentials(url):
     """
@@ -74,8 +77,7 @@ def _try_inject_s3_credentials(url):
     return 's3://' + k + ':' + v + ':' + path
 
 
-
-def make_internal_url(url):
+def _make_internal_url(url):
     """
     Takes a user input url string and translates into url relative to the server process.
     - URL to a local location begins with "local://" or has no "*://" modifier.
@@ -151,7 +153,7 @@ def make_internal_url(url):
         raise ValueError('Invalid url: %s' % url)
 
 
-def download_dataset(url_str, extract=True, force=False, output_dir="."):
+def _download_dataset(url_str, extract=True, force=False, output_dir="."):
     """Download a remote dataset and extract the contents.
 
     Parameters
@@ -195,6 +197,8 @@ def download_dataset(url_str, extract=True, force=False, output_dir="."):
 
 
 __GLCREATE_CURRENT_VERSION_URL__ = "https://dato.com/files/glcreate_current_version"
+__GLCREATE_CURRENT_VERSION_FEATURES_URL__ = "https://dato.com/files/glcreate_current_features"
+
 
 def get_newest_version(timeout=5, _url=__GLCREATE_CURRENT_VERSION_URL__):
     """
@@ -213,13 +217,35 @@ def get_newest_version(timeout=5, _url=__GLCREATE_CURRENT_VERSION_URL__):
     return version
 
 
+def get_newest_features(timeout=2, _url=__GLCREATE_CURRENT_VERSION_FEATURES_URL__):
+    """
+    Returns the features of the lastest GraphLab Create currently available from graphlab.com.
+    Will raise an exception if we are unable to reach the graphlab.com servers.
+
+    timeout: int
+        How many seconds to wait for the remote server to respond
+
+    url: string
+        The URL to go to to check the current version.
+    """
+    request = _urllib2.urlopen(url=_url, timeout=timeout)
+    version = request.read()
+    __LOGGER__.debug("current_feature read %s" % version)
+    return version
+
+
+def get_major_version(version_str):
+    return '.'.join(version_str.split('.')[:2])
+
+
 def perform_version_check(configfile=(_os.path.join(_os.path.expanduser("~"), ".graphlab", "config")),
-                          _url=__GLCREATE_CURRENT_VERSION_URL__,
+                          _version_url=__GLCREATE_CURRENT_VERSION_URL__,
+                          _feature_url=__GLCREATE_CURRENT_VERSION_FEATURES_URL__,
                           _outputstream=_sys.stderr):
     """
     Checks if currently running version of GraphLab Create is less than the
     version available from graphlab.com. Prints a message if the graphlab.com
-    servers are reachable, and the current version is out of date. Does 
+    servers are reachable, and the current version is out of date. Does
     nothing otherwise.
 
     If the configfile contains a key "skip_version_check" in the Product
@@ -243,12 +269,21 @@ def perform_version_check(configfile=(_os.path.join(_os.path.expanduser("~"), ".
     # skip version check set. Quit
     if not skip_version_check:
         try:
-            latest_version = get_newest_version(timeout=1, _url=_url).strip()
-            if parse_version(latest_version) > parse_version(graphlab.version_info.version):
+            latest_version = get_newest_version(timeout=1,
+                                                _url=_version_url).strip()
+            if _parse_version(latest_version) > _parse_version(_version_info.version):
+                try:
+                    _feature_url += '/' + get_major_version(_version_info.version)
+                    latest_features = get_newest_features(timeout=1,
+                                                          _url=_feature_url).strip()
+                except:
+                    latest_features = ''
                 msg = ("A newer version of GraphLab Create (v%s) is available! "
                        "Your current version is v%s.\n"
+                       "%s"  # this is the string of new features list
                        "You can use pip to upgrade the graphlab-create package. "
-                       "For more information see https://dato.com/products/create/upgrade.") % (latest_version, graphlab.version_info.version)
+                       "For more information see https://dato.com/products/create/upgrade.") % \
+                      (latest_version, _version_info.version, latest_features)
                 _outputstream.write(msg)
                 return True
         except:
@@ -321,13 +356,13 @@ def get_environment_config():
     Returns all the GraphLab Create configuration variables that can only
     be set via environment variables.
 
-    GRAPHLAB_FILEIO_WRITER_BUFFER_SIZE
+    - *GRAPHLAB_FILEIO_WRITER_BUFFER_SIZE*
       The file write buffer size.
 
-    GRAPHLAB_FILEIO_READER_BUFFER_SIZE
+    - *GRAPHLAB_FILEIO_READER_BUFFER_SIZE*
       The file read buffer size.
 
-    OMP_NUM_THREADS
+    - *OMP_NUM_THREADS*
       The maximum number of threads to use for parallel processing.
 
     Parameters
@@ -368,51 +403,87 @@ def set_runtime_config(name, value):
     The default configuration is conservatively defined for machines with about
     4-8GB of RAM.
 
-    *Basic Configuration Variables*
+    Note that defaults may change across GraphLab Create versions and the names
+    of performance tuning constants may also change as improved algorithms
+    are developed and implemented.
 
-    GRAPHLAB_CACHE_FILE_LOCATIONS:
-      The directory in which intermediate SFrames/SArray are stored.
-      For instance "/var/tmp".  Multiple directories can be specified separated
-      by a colon (ex: "/var/tmp:/tmp") in which case intermediate SFrames will
-      be striped across both directories (useful for specifying multiple disks).
-      Defaults to /var/tmp if the directory exists, /tmp otherwise.
+    **Basic Configuration Variables**
 
-    GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY:
-      The maximum amount of memory which will be occupied by *all* intermediate
-      SFrames/SArrays. Once this limit is exceeded, SFrames/SArrays will be
-      flushed out to temporary storage (as specified by
-      GRAPHLAB_CACHE_FILE_LOCATIONS). On large systems increasing this as well
-      as GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY_PER_FILE can improve performance
-      significantly. Defaults to 2147483648 bytes (2GB).
+    - *GRAPHLAB_CACHE_FILE_LOCATIONS*
+     The directory in which intermediate SFrames/SArray are stored.
+     For instance "/var/tmp".  Multiple directories can be specified separated
+     by a colon (ex: "/var/tmp:/tmp") in which case intermediate SFrames will
+     be striped across both directories (useful for specifying multiple disks).
+     Defaults to /var/tmp if the directory exists, /tmp otherwise.
 
-    GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY_PER_FILE:
-      The maximum amount of memory which will be occupied by any individual
-      intermediate SFrame/SArray. Once this limit is exceeded, the
-      SFrame/SArray will be flushed out to temporary storage (as specified by
-      GRAPHLAB_CACHE_FILE_LOCATIONS). On large systems, increasing this as well
-      as GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY can improve performance
-      significantly for large SFrames. Defaults to 134217728 bytes (128MB).
+    - *GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY*
+     The maximum amount of memory which will be occupied by *all* intermediate
+     SFrames/SArrays. Once this limit is exceeded, SFrames/SArrays will be
+     flushed out to temporary storage (as specified by
+     `GRAPHLAB_CACHE_FILE_LOCATIONS`). On large systems increasing this as well
+     as `GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY_PER_FILE` can improve performance
+     significantly. Defaults to 2147483648 bytes (2GB).
 
-    *Advanced Configuration Variables*
+    - *GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY_PER_FILE*
+     The maximum amount of memory which will be occupied by any individual
+     intermediate SFrame/SArray. Once this limit is exceeded, the
+     SFrame/SArray will be flushed out to temporary storage (as specified by
+     `GRAPHLAB_CACHE_FILE_LOCATIONS`). On large systems, increasing this as well
+     as `GRAPHLAB_FILEIO_MAXIMUM_CACHE_CAPACITY` can improve performance
+     significantly for large SFrames. Defaults to 134217728 bytes (128MB).
 
-    GRAPHLAB_SFRAME_FILE_HANDLE_POOL_SIZE:
-      The maximum number of file handles to use when reading SFrames/SArrays.
-      Once this limit is exceeded, file handles will be recycled, reducing
-      performance. This limit should be rarely approached by most SFrame/SArray
-      operations. Large SGraphs however may create a large a number of SFrames
-      in which case increasing this limit may improve performance (You may
-      also need to increase the system file handle limit with "ulimit -n").
-      Defaults to 128.
+    **ODBC Configuration**
 
-    GRAPHLAB_SFRAME_IO_READ_LOCK
-      Whether disk reads should be locked. Almost always necessary for magnetic
-      disks for consistent performance. Can be disabled on SSDs. Defaults to
-      True.
+    - *GRAPHLAB_LIBODBC_PREFIX*
+     A directory containing libodbc.so. Also see :func:`graphlab.set_libodbc_path`
+     and :func:`graphlab.connect_odbc`
 
-    GRAPHLAB_SFRAME_DEFAULT_BLOCK_SIZE
-      The block size used by the SFrame file format. Increasing this will
-      increase throughput of single SArray accesses, but decrease throughput of
-      wide SFrame accesses. Defaults to 65536 bytes.
+    - *GRAPHLAB_ODBC_BUFFER_MAX_ROWS*
+     The number of rows to read from ODBC in each batch. Increasing this
+     may give better performance at increased memory consumption. Defaults to
+     2000.
+
+    - *GRAPHLAB_ODBC_BUFFER_SIZE*
+     The maximum ODBC buffer size in bytes when reading. Increasing this may
+     give better performance at increased memory consumption. Defaults to 3GB.
+
+    **Sort Performance Configuration**
+
+    - *GRAPHLAB_SFRAME_SORT_PIVOT_ESTIMATION_SAMPLE_SIZE*
+     The number of random rows to sample from the SFrame to estimate the
+     sort pivots used to partition the sort. Defaults to 2000000.
+
+    - *GRAPHLAB_SFRAME_SORT_BUFFER_SIZE*
+     The maximum estimated memory consumption sort is allowed to use. Increasing
+     this will increase the size of each sort partition, and will increase
+     performance with increased memory consumption. Defaults to 2GB.
+
+    **Join Performance Configuration**
+
+    - *GRAPHLAB_SFRAME_JOIN_BUFFER_NUM_CELLS*
+     The maximum number of cells to buffer in memory. Increasing this will
+     increase the size of each join partition and will increase performance
+     with increased memory consumption.
+     If you have very large cells (very long strings for instance),
+     decreasing this value will help decrease memory consumption.
+     Defaults to 52428800.
+
+    **Groupby Aggregate Performance Configuration**
+
+    - *GRAPHLAB_SFRAME_GROUPBY_BUFFER_NUM_ROWS*
+     The number of groupby keys cached in memory. Increasing this will increase
+     performance with increased memory consumption. Defaults to 1048576.
+
+    **Advanced Configuration Variables**
+
+    - *GRAPHLAB_SFRAME_FILE_HANDLE_POOL_SIZE*
+     The maximum number of file handles to use when reading SFrames/SArrays.
+     Once this limit is exceeded, file handles will be recycled, reducing
+     performance. This limit should be rarely approached by most SFrame/SArray
+     operations. Large SGraphs however may create a large a number of SFrames
+     in which case increasing this limit may improve performance (You may
+     also need to increase the system file handle limit with "ulimit -n").
+     Defaults to 128.
 
     ----------
     name: A string referring to runtime configuration variable.
@@ -434,10 +505,10 @@ def set_runtime_config(name, value):
     if ret != "":
         raise RuntimeError(ret);
 
-GLOB_RE = _re.compile("""[*?]""")
-def split_path_elements(url):
+_GLOB_RE = _re.compile("""[*?]""")
+def _split_path_elements(url):
     parts = _os.path.split(url)
-    m = GLOB_RE.search(parts[-1])
+    m = _GLOB_RE.search(parts[-1])
     if m:
         return (parts[0], parts[1])
     else:
@@ -489,7 +560,7 @@ def get_graphlab_object_type(url):
     Given url where a GraphLab Create object is persisted, return the GraphLab
     Create object type: 'model', 'graph', 'sframe', or 'sarray'
     '''
-    ret = _glconnect.get_unity().get_graphlab_object_type(make_internal_url(url))
+    ret = _glconnect.get_unity().get_graphlab_object_type(_make_internal_url(url))
 
     # to be consistent, we use sgraph instead of graph here
     if ret == 'graph':
@@ -510,6 +581,7 @@ class _distances_utility(object):
 
     """
     def __init__(self):
+        import graphlab
         distances = \
           {'euclidean':         lambda x, y: graphlab.extensions._distances.euclidean(x, y),
            'squared_euclidean': lambda x, y: graphlab.extensions._distances.squared_euclidean(x, y),
@@ -880,7 +952,7 @@ def _get_distance(distance_name):
     def ismatch(distance, actual):
         return (distance == actual) or (distance == '_distances.'+actual)
 
-    for distance, fn in graphlab.distances.__dict__.iteritems():
+    for distance, fn in _gl.distances.__dict__.iteritems():
         if ismatch(distance_name, distance):
             return fn
 
@@ -926,7 +998,7 @@ def _assert_sframe_equal(sf1,
         If true, assert if all rows in the first SFrame exist in the second
         SFrame, but they are not in the same order.
     """
-    if (type(sf1) is not graphlab.SFrame) or (type(sf2) is not graphlab.SFrame):
+    if (type(sf1) is not _gl.SFrame) or (type(sf2) is not _gl.SFrame):
         raise TypeError("Cannot function on types other than SFrames.")
 
     if not check_column_order and not check_column_names:

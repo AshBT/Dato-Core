@@ -62,7 +62,7 @@ namespace fileio {
       }
       // realloc
       data = (char*)realloc(data, new_capacity);
-      owning_cache_manager->increment_utilization((int)new_capacity - (int)capacity);
+      owning_cache_manager->increment_utilization((ssize_t)new_capacity - (ssize_t)capacity);
       capacity = new_capacity;
       return true;
     } else {
@@ -214,11 +214,11 @@ namespace fileio {
     throw std::out_of_range("Cannot find cache block with id " + cache_id);
   }
 
-  void fixed_size_cache_manager::increment_utilization(int increment) {
+  void fixed_size_cache_manager::increment_utilization(ssize_t increment) {
     current_cache_utilization.inc(increment);
   }
 
-  void fixed_size_cache_manager::decrement_utilization(int increment) {
+  void fixed_size_cache_manager::decrement_utilization(ssize_t increment) {
     current_cache_utilization.dec(increment);
   }
 

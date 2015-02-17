@@ -1,3 +1,11 @@
+"""
+This module defines the SFrame class which provides the
+ability to create, access and manipulate a remote scalable dataframe object.
+
+SFrame acts similarly to pandas.DataFrame, but the data is completely immutable
+and is stored column wise on the GraphLab Server side.
+"""
+
 '''
 Copyright (C) 2015 Dato, Inc.
 
@@ -14,19 +22,12 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
-"""
-This module defines the SFrame class which provides the
-ability to create, access and manipulate a remote scalable dataframe object.
-
-SFrame acts similarly to pandas.DataFrame, but the data is completely immutable
-and is stored column wise on the GraphLab Server side.
-"""
 import graphlab.connect as _mt
 import graphlab.connect.main as glconnect
 from graphlab.cython.cy_type_utils import infer_type_of_list
 from graphlab.cython.context import debug_trace as cython_context
 from graphlab.cython.cy_sframe import UnitySFrameProxy
-from graphlab.util import _check_canvas_enabled, make_internal_url, split_path_elements
+from graphlab.util import _check_canvas_enabled, _make_internal_url
 from graphlab.data_structures.sarray import SArray, _create_sequential_sarray
 import graphlab.aggregate
 import graphlab
@@ -39,9 +40,6 @@ from graphlab.deps import pandas, HAS_PANDAS
 import time
 import itertools
 import os
-import sys
-import tempfile
-import glob
 import subprocess
 import uuid
 import platform
@@ -63,6 +61,10 @@ SFRAME_ROOTS = [# Binary/lib location in production egg
                 os.path.abspath(os.path.join(os.path.dirname(
                     os.path.realpath(__file__)),
                         '..', '..',  '..', '..', 'sframe')),
+                # Location of python sources
+                os.path.abspath(os.path.join(os.path.dirname(
+                    os.path.realpath(__file__)),
+                        '..', '..',  '..', '..', 'unity', 'python', 'graphlab')),
                 # Build tree dependency location
                 os.path.abspath(os.path.join(os.path.dirname(
                     os.path.realpath(__file__)),
@@ -74,37 +76,34 @@ RDD_SFRAME_NONPICKLE = "rddtosf_nonpickle"
 SFRAME_RDD_PICKLE = "sftordd_pickle"
 HDFS_LIB = "libhdfs.so"
 RDD_JAR_FILE = "graphlab-create-spark-integration.jar"
+SYS_UTIL_PY = "sys_util.py"
 RDD_SUPPORT_INITED = False
 BINARY_PATHS = {}
 STAGING_DIR = None
 RDD_SUPPORT = True
 PRODUCTION_RUN = False
 YARN_OS = None
+SPARK_SUPPORT_NAMES = {'RDD_SFRAME_PATH':'rddtosf_pickle',
+        'RDD_SFRAME_NONPICKLE_PATH':'rddtosf_nonpickle',
+        'SFRAME_RDD_PATH':'sftordd_pickle',
+        'HDFS_LIB_PATH':'libhdfs.so',
+        'RDD_JAR_PATH':'graphlab-create-spark-integration.jar',
+        'SYS_UTIL_PY_PATH':'sys_util.py',
+        'SPARK_PIPE_WRAPPER_PATH':'spark_pipe_wrapper'}
 
 first = True
 for i in SFRAME_ROOTS:
-    tmp_path = os.path.join(i, RDD_SFRAME_NONPICKLE)
-    if 'RDD_SFRAME_NONPICKLE_PATH' not in BINARY_PATHS and os.path.isfile(tmp_path):
-        BINARY_PATHS['RDD_SFRAME_NONPICKLE_PATH'] = tmp_path
-    tmp_path = os.path.join(i, RDD_SFRAME_PICKLE)
-    if 'RDD_SFRAME_PATH' not in BINARY_PATHS and os.path.isfile(tmp_path):
-        BINARY_PATHS['RDD_SFRAME_PATH'] = tmp_path
-    tmp_path = os.path.join(i, SFRAME_RDD_PICKLE)
-    if 'SFRAME_RDD_PATH' not in BINARY_PATHS and os.path.isfile(tmp_path):
-        BINARY_PATHS['SFRAME_RDD_PATH'] = tmp_path
-    tmp_path = os.path.join(i, HDFS_LIB)
-    if 'HDFS_LIB_PATH' not in BINARY_PATHS and os.path.isfile(tmp_path):
-        BINARY_PATHS['HDFS_LIB_PATH'] = tmp_path
-    tmp_path = os.path.join(i, RDD_JAR_FILE)
-    if 'RDD_JAR_PATH' not in BINARY_PATHS and os.path.isfile(tmp_path):
-        BINARY_PATHS['RDD_JAR_PATH'] = tmp_path
-    if all(name in BINARY_PATHS for name in ['RDD_SFRAME_PATH', 'RDD_SFRAME_NONPICKLE_PATH', 'SFRAME_RDD_PATH', 'HDFS_LIB_PATH', 'RDD_JAR_PATH']):
+    for key,val in SPARK_SUPPORT_NAMES.iteritems():
+        tmp_path = os.path.join(i, val)
+        if key not in BINARY_PATHS and os.path.isfile(tmp_path):
+            BINARY_PATHS[key] = tmp_path
+    if all(name in BINARY_PATHS for name in SPARK_SUPPORT_NAMES.keys()):
         if first:
             PRODUCTION_RUN = True
         break
     first = False
 
-if not all(name in BINARY_PATHS for name in ['RDD_SFRAME_PATH', 'RDD_SFRAME_NONPICKLE_PATH', 'SFRAME_RDD_PATH', 'HDFS_LIB_PATH', 'RDD_JAR_PATH']):
+if not all(name in BINARY_PATHS for name in SPARK_SUPPORT_NAMES.keys()):
     RDD_SUPPORT = False
 
 def get_spark_integration_jar_path():
@@ -146,6 +145,8 @@ def __rdd_support_init__(sprk_ctx):
         # Set binary path
         for i in BINARY_PATHS.keys():
             s = BINARY_PATHS[i]
+            if os.path.basename(s) == SPARK_SUPPORT_NAMES['SYS_UTIL_PY_PATH']:
+                continue
             if YARN_OS == 'Linux':
                 BINARY_PATHS[i] = os.path.join(os.path.dirname(s), 'linux', os.path.basename(s))
             elif YARN_OS == 'Darwin':
@@ -193,6 +194,8 @@ def __rdd_support_init__(sprk_ctx):
         sprk_ctx.addFile(BINARY_PATHS['HDFS_LIB_PATH'])
         sprk_ctx.addFile(BINARY_PATHS['SFRAME_RDD_PATH'])
         sprk_ctx.addFile(BINARY_PATHS['RDD_SFRAME_NONPICKLE_PATH'])
+        sprk_ctx.addFile(BINARY_PATHS['SYS_UTIL_PY_PATH'])
+        sprk_ctx.addFile(BINARY_PATHS['SPARK_PIPE_WRAPPER_PATH'])
         sprk_ctx._jsc.addJar(BINARY_PATHS['RDD_JAR_PATH'])
 
     RDD_SUPPORT_INITED = True
@@ -273,7 +276,7 @@ class SFrame(object):
         parameter. If ``data`` is an array or Pandas DataFrame, the contents are
         stored in the SFrame. If ``data`` is a string, it is interpreted as a
         file. Files can be read from local file system or urls (local://,
-        hdfs://, s3://, http://, or remote://).
+        hdfs://, s3://, http://).
 
     format : string, optional
         Format of the data. The default, "auto" will automatically infer the
@@ -309,9 +312,439 @@ class SFrame(object):
       remote file path. See the examples below. A similar restriction applies to
       :py:class:`graphlab.SGraph` and :py:class:`graphlab.SArray`.
 
+    - When reading from HDFS on Linux we must guess the location of your java
+      installation. By default, we will use the location pointed to by the
+      JAVA_HOME environment variable.  If this is not set, we check many common
+      installation paths. You may use two environment variables to override
+      this behavior.  GRAPHLAB_JAVA_HOME allows you to specify a specific java
+      installation and overrides JAVA_HOME.  GRAPHLAB_LIBJVM_DIRECTORY
+      overrides all and expects the exact directory that your preferred
+      libjvm.so file is located.  Use this ONLY if you'd like to use a
+      non-standard JVM.
+
     Examples
     --------
-    Create an SFrame from a Python dictionary.
+
+    >>> import graphlab
+    >>> from graphlab import SFrame
+
+    **Construction**
+
+    Construct an SFrame from a dataframe and transfers the dataframe object
+    across the network.
+
+    >>> df = pandas.DataFrame()
+    >>> sf = SFrame(data=df)
+
+    Construct an SFrame from a local csv file (only works for local server).
+
+    >>> sf = SFrame(data='~/mydata/foo.csv')
+
+    Construct an SFrame from a csv file on Amazon S3. This requires the
+    environment variables: *AWS_ACCESS_KEY_ID* and *AWS_SECRET_ACCESS_KEY* to be
+    set before the python session started. Alternatively, you can use
+    :py:func:`graphlab.aws.set_credentials()` to set the credentials after
+    python is started and :py:func:`graphlab.aws.get_credentials()` to verify
+    these environment variables.
+
+    >>> sf = SFrame(data='s3://mybucket/foo.csv')
+
+    Read from HDFS using a specific java installation (environment variable
+    only applies when using Linux)
+
+    >>> import os
+    >>> os.environ['GRAPHLAB_JAVA_HOME'] = '/my/path/to/java'
+    >>> from graphlab import SFrame
+    >>> sf = SFrame("hdfs://mycluster.example.com:8020/user/myname/coolfile.txt")
+
+    An SFrame can be constructed from a dictionary of values or SArrays:
+
+    >>> sf = gl.SFrame({'id':[1,2,3],'val':['A','B','C']})
+    >>> sf
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+    2  3   C
+
+    Or equivalently:
+
+    >>> ids = SArray([1,2,3])
+    >>> vals = SArray(['A','B','C'])
+    >>> sf = SFrame({'id':ids,'val':vals})
+
+    It can also be constructed from an array of SArrays in which case column
+    names are automatically assigned.
+
+    >>> ids = SArray([1,2,3])
+    >>> vals = SArray(['A','B','C'])
+    >>> sf = SFrame([ids, vals])
+    >>> sf
+    Columns:
+        X1 int
+        X2 str
+    Rows: 3
+    Data:
+       X1  X2
+    0  1   A
+    1  2   B
+    2  3   C
+
+    If the SFrame is constructed from a list of values, an SFrame of a single
+    column is constructed.
+
+    >>> sf = SFrame([1,2,3])
+    >>> sf
+    Columns:
+        X1 int
+    Rows: 3
+    Data:
+       X1
+    0  1
+    1  2
+    2  3
+
+    **Parsing**
+
+    The :py:func:`graphlab.SFrame.read_csv()` is quite powerful and, can be
+    used to import a variety of row-based formats.
+
+    First, some simple cases:
+
+    >>> !cat ratings.csv
+    user_id,movie_id,rating
+    10210,1,1
+    10213,2,5
+    10217,2,2
+    10102,1,3
+    10109,3,4
+    10117,5,2
+    10122,2,4
+    10114,1,5
+    10125,1,1
+    >>> gl.SFrame.read_csv('ratings.csv')
+    Columns:
+      user_id   int
+      movie_id  int
+      rating    int
+    Rows: 9
+    Data:
+    +---------+----------+--------+
+    | user_id | movie_id | rating |
+    +---------+----------+--------+
+    |  10210  |    1     |   1    |
+    |  10213  |    2     |   5    |
+    |  10217  |    2     |   2    |
+    |  10102  |    1     |   3    |
+    |  10109  |    3     |   4    |
+    |  10117  |    5     |   2    |
+    |  10122  |    2     |   4    |
+    |  10114  |    1     |   5    |
+    |  10125  |    1     |   1    |
+    +---------+----------+--------+
+    [9 rows x 3 columns]
+
+
+    Delimiters can be specified, if "," is not the delimiter, for instance
+    space ' ' in this case. Only single character delimiters are supported.
+
+    >>> !cat ratings.csv
+    user_id movie_id rating
+    10210 1 1
+    10213 2 5
+    10217 2 2
+    10102 1 3
+    10109 3 4
+    10117 5 2
+    10122 2 4
+    10114 1 5
+    10125 1 1
+    >>> gl.SFrame.read_csv('ratings.csv', delimiter=' ')
+
+    By default, "NA" or a missing element are interpreted as missing values.
+
+    >>> !cat ratings2.csv
+    user,movie,rating
+    "tom",,1
+    harry,5,
+    jack,2,2
+    bill,,
+    >>> gl.SFrame.read_csv('ratings2.csv')
+    Columns:
+      user  str
+      movie int
+      rating    int
+    Rows: 4
+    Data:
+    +---------+-------+--------+
+    |   user  | movie | rating |
+    +---------+-------+--------+
+    |   tom   |  None |   1    |
+    |  harry  |   5   |  None  |
+    |   jack  |   2   |   2    |
+    | missing |  None |  None  |
+    +---------+-------+--------+
+    [4 rows x 3 columns]
+
+    Furthermore due to the dictionary types and list types, can handle parsing
+    of JSON-like formats.
+
+    >>> !cat ratings3.csv
+    business, categories, ratings
+    "Restaurant 1", [1 4 9 10], {"funny":5, "cool":2}
+    "Restaurant 2", [], {"happy":2, "sad":2}
+    "Restaurant 3", [2, 11, 12], {}
+    >>> gl.SFrame.read_csv('ratings3.csv')
+    Columns:
+    business    str
+    categories  array
+    ratings dict
+    Rows: 3
+    Data:
+    +--------------+--------------------------------+-------------------------+
+    |   business   |           categories           |         ratings         |
+    +--------------+--------------------------------+-------------------------+
+    | Restaurant 1 | array('d', [1.0, 4.0, 9.0, ... | {'funny': 5, 'cool': 2} |
+    | Restaurant 2 |           array('d')           |  {'sad': 2, 'happy': 2} |
+    | Restaurant 3 | array('d', [2.0, 11.0, 12.0])  |            {}           |
+    +--------------+--------------------------------+-------------------------+
+    [3 rows x 3 columns]
+
+    The list and dictionary parsers are quite flexible and can absorb a
+    variety of purely formatted inputs. Also, note that the list and dictionary
+    types are recursive, allowing for arbitrary values to be contained.
+
+    All these are valid lists:
+
+    >>> !cat interesting_lists.csv
+    list
+    []
+    [1,2,3]
+    [1;2,3]
+    [1 2 3]
+    [{a:b}]
+    ["c",d, e]
+    [[a]]
+    >>> gl.SFrame.read_csv('interesting_lists.csv')
+    Columns:
+      list  list
+    Rows: 7
+    Data:
+    +-----------------+
+    |       list      |
+    +-----------------+
+    |        []       |
+    |    [1, 2, 3]    |
+    |    [1, 2, 3]    |
+    |    [1, 2, 3]    |
+    |   [{'a': 'b'}]  |
+    | ['c', 'd', 'e'] |
+    |     [['a']]     |
+    +-----------------+
+    [7 rows x 1 columns]
+
+    All these are valid dicts:
+
+    >>> !cat interesting_dicts.csv
+    dict
+    {"classic":1,"dict":1}
+    {space:1 seperated:1}
+    {emptyvalue:}
+    {}
+    {:}
+    {recursive1:[{a:b}]}
+    {:[{:[a]}]}
+    >>> gl.SFrame.read_csv('interesting_dicts.csv')
+    Columns:
+      dict  dict
+    Rows: 7
+    Data:
+    +------------------------------+
+    |             dict             |
+    +------------------------------+
+    |  {'dict': 1, 'classic': 1}   |
+    | {'seperated': 1, 'space': 1} |
+    |     {'emptyvalue': None}     |
+    |              {}              |
+    |         {None: None}         |
+    | {'recursive1': [{'a': 'b'}]} |
+    | {None: [{None: array('d')}]} |
+    +------------------------------+
+    [7 rows x 1 columns]
+
+    **Saving**
+
+    Save and load the sframe in native format.
+
+    >>> sf.save('mysframedir')
+    >>> sf2 = graphlab.load_sframe('mysframedir')
+
+    **Column Manipulation **
+
+    An SFrame is composed of a collection of columns of SArrays, and individual
+    SArrays can be extracted easily. For instance given an SFrame:
+
+    >>> sf = SFrame({'id':[1,2,3],'val':['A','B','C']})
+    >>> sf
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+    2  3   C
+
+    The "id" column can be extracted using:
+
+    >>> sf["id"]
+    dtype: int
+    Rows: 3
+    [1, 2, 3]
+
+    And can be deleted using:
+
+    >>> del sf["id"]
+
+    Multiple columns can be selected by passing a list of column names:
+
+    >>> sf = SFrame({'id':[1,2,3],'val':['A','B','C'],'val2':[5,6,7]})
+    >>> sf
+    Columns:
+        id   int
+        val  str
+        val2 int
+    Rows: 3
+    Data:
+       id  val val2
+    0  1   A   5
+    1  2   B   6
+    2  3   C   7
+    >>> sf2 = sf[['id','val']]
+    >>> sf2
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+    2  3   C
+
+    The same mechanism can be used to re-order columns:
+
+    >>> sf = SFrame({'id':[1,2,3],'val':['A','B','C']})
+    >>> sf
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+    2  3   C
+    >>> sf[['val','id']]
+    >>> sf
+    Columns:
+        val str
+        id  int
+    Rows: 3
+    Data:
+       val id
+    0  A   1
+    1  B   2
+    2  C   3
+
+    **Element Access and Slicing**
+    SFrames can be accessed by integer keys just like a regular python list.
+    Such operations may not be fast on large datasets so looping over an SFrame
+    should be avoided.
+
+    >>> sf = SFrame({'id':[1,2,3],'val':['A','B','C']})
+    >>> sf[0]
+    {'id': 1, 'val': 'A'}
+    >>> sf[2]
+    {'id': 3, 'val': 'C'}
+    >>> sf[5]
+    IndexError: SFrame index out of range
+
+    Negative indices can be used to access elements from the tail of the array
+
+    >>> sf[-1] # returns the last element
+    {'id': 3, 'val': 'C'}
+    >>> sf[-2] # returns the second to last element
+    {'id': 2, 'val': 'B'}
+
+    The SFrame also supports the full range of python slicing operators:
+
+    >>> sf[1000:] # Returns an SFrame containing rows 1000 to the end
+    >>> sf[:1000] # Returns an SFrame containing rows 0 to row 999 inclusive
+    >>> sf[0:1000:2] # Returns an SFrame containing rows 0 to row 1000 in steps of 2
+    >>> sf[-100:] # Returns an SFrame containing last 100 rows
+    >>> sf[-100:len(sf):2] # Returns an SFrame containing last 100 rows in steps of 2
+
+    **Logical Filter**
+
+    An SFrame can be filtered using
+
+    >>> sframe[binary_filter]
+
+    where sframe is an SFrame and binary_filter is an SArray of the same length.
+    The result is a new SFrame which contains only rows of the SFrame where its
+    matching row in the binary_filter is non zero.
+
+    This permits the use of boolean operators that can be used to perform
+    logical filtering operations. For instance, given an SFrame
+
+    >>> sf
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+    2  3   C
+
+    >>> sf[(sf['id'] >= 1) & (sf['id'] <= 2)]
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+
+    See :class:`~graphlab.SArray` for more details on the use of the logical
+    filter.
+
+    This can also be used more generally to provide filtering capability which
+    is otherwise not expressible with simple boolean functions. For instance:
+
+    >>> sf[sf['id'].apply(lambda x: math.log(x) <= 1)]
+    Columns:
+        id  int
+        val str
+    Rows: 3
+    Data:
+       id  val
+    0  1   A
+    1  2   B
+
+    Or alternatively:
+
+    >>> sf[sf.apply(lambda x: math.log(x['id']) <= 1)]
+
+            Create an SFrame from a Python dictionary.
 
     >>> from graphlab import SFrame
     >>> sf = SFrame({'id':[1,2,3], 'val':['A','B','C']})
@@ -325,22 +758,6 @@ class SFrame(object):
     0  1   A
     1  2   B
     2  3   C
-
-    Create an SFrame from a remote CSV file.
-
-    >>> url = 'http://testdatasets.s3-website-us-west-2.amazonaws.com/users.csv.gz'
-    >>> sf = SFrame.read_csv(url,
-    ...     delimiter=',', header=True, comment_char="#",
-    ...     column_type_hints={'user_id': int})
-
-    Working with a GraphLab EC2 instance.
-
-    >>> graphlab.aws.launch_EC2('m1.large')
-    >>> sf = SFrame('~/mydata/foo.csv')             # throws exception
-    >>> sf = SFrame('remote:///mydata/foo.csv')     # works
-    >>> sf = SFrame('http://testdatasets.s3-website-us-west-2.amazonaws.com/users.csv.gz') # works
-    >>> sf = SFrame('s3://mybucket/foo.csv')        # works
-    >>> graphlab.aws.teminate_EC2()
     """
 
     __slots__ = ['shape', '__proxy__', '_proxy']
@@ -427,15 +844,15 @@ class SFrame(object):
                         else:
                             self.__proxy__.add_column(SArray(val).__proxy__, key)
                 elif (_format == 'csv'):
-                    url = make_internal_url(data)
+                    url = _make_internal_url(data)
                     tmpsf = SFrame.read_csv(url, delimiter=',', header=True)
                     self.__proxy__ = tmpsf.__proxy__
                 elif (_format == 'tsv'):
-                    url = make_internal_url(data)
+                    url = _make_internal_url(data)
                     tmpsf = SFrame.read_csv(url, delimiter='\t', header=True)
                     self.__proxy__ = tmpsf.__proxy__
                 elif (_format == 'sframe'):
-                    url = make_internal_url(data)
+                    url = _make_internal_url(data)
                     self.__proxy__.load_from_sframe_index(url)
                 elif (_format == 'empty'):
                     pass
@@ -457,7 +874,7 @@ class SFrame(object):
           print "Insufficient number of rows to perform type inference"
           raise RuntimeError("Insufficient rows")
         # gets all the values column-wise
-        all_column_values_transposed = [list(first_rows[col]) 
+        all_column_values_transposed = [list(first_rows[col])
                 for col in first_rows.column_names()]
         # transpose
         all_column_values = [list(x) for x in zip(*all_column_values_transposed)]
@@ -548,7 +965,7 @@ class SFrame(object):
           parsing_config["row_limit"] = nrows
 
         proxy = UnitySFrameProxy(glconnect.get_client())
-        internal_url = make_internal_url(url)
+        internal_url = _make_internal_url(url)
 
         if (not verbose):
             glconnect.get_client().set_log_progress(False)
@@ -579,7 +996,9 @@ class SFrame(object):
                 print "the column_type_hints argument"
                 print "------------------------------------------------------"
                 column_type_inference_was_used = True
-            except:
+            except Exception as e:
+                if type(e) == RuntimeError and "CSV parsing cancelled" in e.message:
+                    raise e
                 # If the above fails, default back to str for all columns.
                 column_type_hints = str
                 print 'Could not detect types. Using str for each column.'
@@ -606,7 +1025,9 @@ class SFrame(object):
         try:
             with cython_context():
                 errors = proxy.load_from_csvs(internal_url, parsing_config, type_hints)
-        except:
+        except Exception as e:
+            if type(e) == RuntimeError and "CSV parsing cancelled" in e.message:
+                raise e
             if column_type_inference_was_used:
                 # try again
                 print "Unable to parse the file with automatic type inference."
@@ -777,7 +1198,7 @@ class SFrame(object):
             or a "glob" pattern, all matching files will be loaded.
 
         delimiter : string, optional
-            This describes the delimiter used for parsing csv files. 
+            This describes the delimiter used for parsing csv files.
 
         header : bool, optional
             If true, uses the first row as the column names. Otherwise use the
@@ -1025,25 +1446,56 @@ class SFrame(object):
         sc : SparkContext
             sc is an existing SparkContext.
 
-        sql: SQLContext
+        sql : SQLContext
             sql is an existing SQLContext.
 
-        number_of_partitions: int
+        number_of_partitions : int
             number of partitions for the output rdd
 
         Returns
         ----------
         out: SchemaRDD
+
+        Examples
+        --------
+
+        >>> from pyspark import SparkContext, SQLContext
+        >>> from graphlab import SFrame
+        >>> sc = SparkContext('local')
+        >>> sqlc = SQLContext(sc)
+        >>> sf = SFrame({'x': [1,2,3], 'y': ['fish', 'chips', 'salad']})
+        >>> rdd = sf.to_schema_rdd(sc, sqlc)
+        >>> rdd.collect()
+        [Row(x=1, y=u'fish'), Row(x=2, y=u'chips'), Row(x=3, y=u'salad')]
         """
+
+        def homogeneous_type(seq):
+            if seq is None or len(seq) == 0:
+                return True
+            iseq = iter(seq)
+            first_type = type(next(iseq))
+            return True if all( (type(x) is first_type) for x in iseq ) else False
+
+        if len(self) == 0:
+            raise ValueError("SFrame is empty")
+
+        column_names = self.column_names()
+        first_row = self.head(1)[0]
+
+        for name in column_names:
+            if hasattr(first_row[name],'__iter__') and homogeneous_type(first_row[name]) is not True:
+                raise TypeError("Support for translation to Spark SchemaRDD not enabled for heterogeneous iterable type (column: %s). Use SFrame.to_rdd()." % name)
 
         for _type in self.column_types():
                 if(_type.__name__ == 'datetime'):
                     raise TypeError("Support for translation to Spark SchemaRDD not enabled for datetime type. Use SFrame.to_rdd() ")
 
         rdd = self.to_rdd(sc,number_of_partitions);
-        return sql.inferSchema(rdd)
+        from pyspark.sql import Row
+        rowRdd = rdd.map(lambda x: Row(**x))
+        return sql.inferSchema(rowRdd)
 
-    def to_rdd(self,sc,number_of_partitions=4):
+    def to_rdd(self, sc, number_of_partitions=4):
         """
         Convert the current SFrame to the Spark RDD.
 
@@ -1074,6 +1526,16 @@ class SFrame(object):
         ----------
         out: RDD
 
+        Examples
+        --------
+
+        >>> from pyspark import SparkContext
+        >>> from graphlab import SFrame
+        >>> sc = SparkContext('local')
+        >>> sf = SFrame({'x': [1,2,3], 'y': ['fish', 'chips', 'salad']})
+        >>> rdd = sf.to_rdd(sc)
+        >>> rdd.collect()
+        [{'x': 1L, 'y': 'fish'}, {'x': 2L, 'y': 'chips'}, {'x': 3L, 'y': 'salad'}]
         """
         _mt._get_metric_tracker().track('sframe.to_rdd')
         if not RDD_SUPPORT:
@@ -1116,14 +1578,21 @@ class SFrame(object):
                 start_index = start_index + small_partition_size
             count+=1
         from pyspark import RDD
-        sc.addFile(BINARY_PATHS['SFRAME_RDD_PATH'])
         rdd = sc.parallelize(ranges,number_of_partitions)
         if sc.master[0:5] == 'local':
-            pipeRdd = sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(rdd._jrdd).pipe(BINARY_PATHS['SFRAME_RDD_PATH'] + " " + sf_loc)
+            pipeRdd = sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(
+                rdd._jrdd).pipe(
+                    BINARY_PATHS['SPARK_PIPE_WRAPPER_PATH'] + \
+                        " " + BINARY_PATHS['SFRAME_RDD_PATH'] + " " + sf_loc)
         elif sc.master == 'yarn-client':
-            pipeRdd = sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(rdd._jrdd).pipe("./" + SFRAME_RDD_PICKLE + " " + sf_loc)
+            pipeRdd = sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(
+                rdd._jrdd).pipe(
+                    "./" + SPARK_SUPPORT_NAMES['SPARK_PIPE_WRAPPER_PATH'] + \
+                    " " + "./" + SPARK_SUPPORT_NAMES['SFRAME_RDD_PATH'] + \
+                    " " + sf_loc)
         serializedRdd = sc._jvm.org.graphlab.create.GraphLabUtil.stringToByte(pipeRdd)
-        output_rdd = RDD(serializedRdd,sc,rdd._jrdd_deserializer)
+        import pyspark
+        output_rdd = RDD(serializedRdd,sc,pyspark.serializers.PickleSerializer())
 
         return output_rdd
 
@@ -1162,6 +1631,25 @@ class SFrame(object):
         Returns
         -------
         out : SFrame
+
+        Examples
+        --------
+
+        >>> from pyspark import SparkContext
+        >>> from graphlab import SFrame
+        >>> sc = SparkContext('local')
+        >>> rdd = sc.parallelize([1,2,3])
+        >>> sf = SFrame.from_rdd(rdd)
+        >>> sf
+        Data:
+        +-----+
+        |  X1 |
+        +-----+
+        | 1.0 |
+        | 2.0 |
+        | 3.0 |
+        +-----+
+        [3 rows x 1 columns]
         """
         _mt._get_metric_tracker().track('sframe.from_rdd')
         if not RDD_SUPPORT:
@@ -1169,14 +1657,16 @@ class SFrame(object):
 
         checkRes = rdd.take(1);
 
-        if len(checkRes) > 0 and checkRes[0].__class__.__name__ == 'Row' and rdd.__class__.__name__ != 'SchemaRDD':
+        if len(checkRes) > 0 and checkRes[0].__class__.__name__ == 'Row' and rdd.__class__.__name__ not in {'SchemaRDD','DataFrame'}:
             raise Exception("Conversion from RDD(pyspark.sql.Row) to SFrame not supported. Please call inferSchema(RDD) first.")
 
         if(rdd._jrdd_deserializer.__class__.__name__ == 'UTF8Deserializer'):
             return SFrame.__from_UTF8Deserialized_rdd__(rdd)
 
         sf_names = None
-        if(str(type(rdd)) ==  "<class 'pyspark.sql.SchemaRDD'>"):
+        rdd_type = "rdd"
+        if rdd.__class__.__name__ in {'SchemaRDD','DataFrame'}:
+            rdd_type = "schemardd"
             first_row = rdd.take(1)[0]
             if hasattr(first_row, 'keys'):
               sf_names = first_row.keys()
@@ -1198,9 +1688,17 @@ class SFrame(object):
             mode = "pickle"
 
         if cur_sc.master[0:5] == 'local':
-            t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.byteToString(rdd._jrdd).pipe(BINARY_PATHS['RDD_SFRAME_PATH'] + " " + tmp_loc + " " + mode)
+            t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.byteToString(
+                rdd._jrdd).pipe(
+                    BINARY_PATHS['SPARK_PIPE_WRAPPER_PATH'] + " " + \
+                    BINARY_PATHS['RDD_SFRAME_PATH'] + " " + tmp_loc +\
+                    " " + mode + " " + rdd_type)
         else:
-            t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.byteToString(rdd._jrdd).pipe("./" + RDD_SFRAME_PICKLE + " " + tmp_loc + " " + mode)
+            t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.byteToString(
+                rdd._jrdd).pipe(
+                    "./" + SPARK_SUPPORT_NAMES['SPARK_PIPE_WRAPPER_PATH'] +\
+                    " " + "./" + SPARK_SUPPORT_NAMES['RDD_SFRAME_PATH'] + " " +\
+                    tmp_loc + " " + mode + " " + rdd_type)
 
         # We get the location of an SFrame index file per Spark partition in
         # the result.  We assume that this is in partition order.
@@ -1210,7 +1708,7 @@ class SFrame(object):
         sframe_list = []
         for url in res:
             sf = SFrame()
-            sf.__proxy__.load_from_sframe_index(make_internal_url(url))
+            sf.__proxy__.load_from_sframe_index(_make_internal_url(url))
             sf.__proxy__.delete_on_close()
             out_sf_coltypes = out_sf.column_types()
             if(len(out_sf_coltypes) != 0):
@@ -1220,6 +1718,7 @@ class SFrame(object):
 
                 for i in range(len(sf_coltypes)):
                     if sf_coltypes[i] != out_sf_coltypes[i]:
+                        print "mismatch for types %s and %s" % (sf_coltypes[i],out_sf_coltypes[i])
                         sf[sf_temp_names[i]] = sf[sf_temp_names[i]].astype(str)
                         out_sf[out_sf_temp_names[i]] = out_sf[out_sf_temp_names[i]].astype(str)
             out_sf = out_sf.append(sf)
@@ -1249,7 +1748,7 @@ class SFrame(object):
             raise RuntimeError("Could not determine staging directory for SFrame files.")
 
 
-        if(str(type(rdd)) ==  "<class 'pyspark.sql.SchemaRDD'>"):
+        if(rdd.__class__.__name__ in {'SchemaRDD','DataFrame'}):
             first_row = rdd.take(1)[0]
             if hasattr(first_row, 'keys'):
               sf_names = first_row.keys()
@@ -1268,14 +1767,31 @@ class SFrame(object):
             for i in sf_types:
                 types += i.__name__ + ","
             if cur_sc.master[0:5] == 'local':
-              t = rdd._jschema_rdd.toJavaStringOfValues().pipe(BINARY_PATHS['RDD_SFRAME_NONPICKLE_PATH']  + " " + tmp_loc + " " + types)
+              t = rdd._jschema_rdd.toJavaStringOfValues().pipe(
+                  BINARY_PATHS['SPARK_PIPE_WRAPPER_PATH'] + " " +\
+                  BINARY_PATHS['RDD_SFRAME_NONPICKLE_PATH']  + " " + tmp_loc +\
+                  " " + types)
             else:
-              t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.toJavaStringOfValues(rdd._jschema_rdd).pipe("./" + RDD_SFRAME_NONPICKLE + " " + tmp_loc + " " + types)
+              t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.toJavaStringOfValues(
+                  rdd._jschema_rdd).pipe(
+                      "./" + SPARK_SUPPORT_NAMES['SPARK_PIPE_WRAPPER_PATH'] +\
+                      " " + "./" +\
+                      SPARK_SUPPORT_NAMES['RDD_SFRAME_NONPICKLE_PATH'] + " " +\
+                      tmp_loc + " " + types)
         else:
             if cur_sc.master[0:5] == 'local':
-              t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(rdd._jrdd).pipe(BINARY_PATHS['RDD_SFRAME_NONPICKLE_PATH'] +  " " + tmp_loc)
+              t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(
+                  rdd._jrdd).pipe(
+                      BINARY_PATHS['SPARK_PIPE_WRAPPER_PATH'] + " " +\
+                      BINARY_PATHS['RDD_SFRAME_NONPICKLE_PATH'] +  " " +\
+                      tmp_loc)
             else:
-              t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(rdd._jrdd).pipe("./" + RDD_SFRAME_NONPICKLE + " " + tmp_loc)
+              t = cur_sc._jvm.org.graphlab.create.GraphLabUtil.pythonToJava(
+                  rdd._jrdd).pipe(
+                      "./" + SPARK_SUPPORT_NAMES['SPARK_PIPE_WRAPPER_PATH'] +\
+                      " " + "./" +\
+                      SPARK_SUPPORT_NAMES['RDD_SFRAME_NONPICKLE_PATH'] + " " +\
+                      tmp_loc)
 
         # We get the location of an SFrame index file per Spark partition in
         # the result.  We assume that this is in partition order.
@@ -1285,7 +1801,7 @@ class SFrame(object):
         sframe_list = []
         for url in res:
             sf = SFrame()
-            sf.__proxy__.load_from_sframe_index(make_internal_url(url))
+            sf.__proxy__.load_from_sframe_index(_make_internal_url(url))
             sf.__proxy__.delete_on_close()
             out_sf = out_sf.append(sf)
 
@@ -1417,9 +1933,8 @@ class SFrame(object):
         """
         Returns a string description of the frame
         """
-
         printed_sf = self._imagecols_to_stringcols()
-        ret = self.__get_column_description__();
+        ret = self.__get_column_description__()
         if self.__has_size__():
             ret = ret + "Rows: " + str(len(self)) + "\n\n"
         else:
@@ -1430,7 +1945,6 @@ class SFrame(object):
         else:
             ret = ret + "\t[]"
         return ret
-
 
     def __get_column_description__(self):
         colnames = self.column_names()
@@ -1476,36 +1990,53 @@ class SFrame(object):
         if headsf.shape == (0, 0):
             return [PrettyTable()]
 
+        # convert array.array column to list column so they print like [...]
+        # and not array('d', ...)
+        for col in headsf.column_names():
+            if headsf[col].dtype() is array.array:
+                headsf[col] = headsf[col].astype(list)
+
+        def _value_to_str(value):
+            if (type(value) is array.array):
+                return str(list(value))
+            elif (type(value) is list):
+                return '[' + ", ".join(_value_to_str(x) for x in value) + ']'
+            else:
+                return str(value)
+
+        def _escape_space(s):
+            return "".join([ch.encode('string_escape') if ch.isspace() else ch for ch in s])
+
+        def _truncate_respect_unicode(s, max_length):
+            if (len(s) <= max_length):
+                return s
+            else:
+                u = unicode(s, 'utf-8', errors='replace')
+                return u[:max_length].encode('utf-8')
+
         def _truncate_str(s, wrap_str=False):
             """
             Truncate and optionally wrap the input string as unicode, replace
             unconvertible character with a diamond ?.
             """
-            s = repr(s)
-            # repr adds the escape characters. but also adds quotes around
-            # the string
-            if (len(s) >= 2):
-              s = s[1:-1]
+            s = _escape_space(s)
+
             if len(s) <= max_column_width:
-                return unicode(s, errors='replace')
+                return unicode(s, 'utf-8', errors='replace')
             else:
                 ret = ''
                 # if wrap_str is true, wrap the text and take at most 2 rows
                 if wrap_str:
                     wrapped_lines = wrap(s, max_column_width)
-                    ret = "\n".join(wrapped_lines[:2])
-                    last_line = wrapped_lines[:2][-1]
-                    if len(last_line) >= max_column_width or len(wrapped_lines) > 2:
-                        space_left = max_column_width - len(last_line)
-                        space_truncate = max(0, 4 - space_left)
-                        if space_truncate > 0:
-                            ret = ret[:-space_truncate] + ' ...'
-                        else:
-                            ret = ret + ' ...'
+                    if len(wrapped_lines) == 1:
+                        return wrapped_lines[0]
+                    last_line = wrapped_lines[1]
+                    if len(last_line) >= max_column_width:
+                        last_line = _truncate_respect_unicode(last_line, max_column_width - 4)
+                    ret = wrapped_lines[0] + '\n' + last_line + ' ...'
                 else:
-                    ret = s[:max_column_width]
-                    ret = ret[:-4] + ' ...'
-                return unicode(ret, errors='replace')
+                    ret = _truncate_respect_unicode(s, max_column_width - 4) + '...'
+                return unicode(ret, 'utf-8', errors='replace')
 
         columns = self.column_names()[:max_columns]
         columns.reverse()  # reverse the order of columns and we will pop from the end
@@ -1528,7 +2059,7 @@ class SFrame(object):
                 if (table_width + col_width < max_row_width):
                     # truncate the header if necessary
                     header = _truncate_str(col, wrap_text)
-                    tbl.add_column(header, [_truncate_str(str(x), wrap_text) for x in headsf[col]])
+                    tbl.add_column(header, [_truncate_str(_value_to_str(x), wrap_text) for x in headsf[col]])
                     table_width = str(tbl).find('\n')
                     num_column_of_last_table += 1
                 else:
@@ -1591,7 +2122,6 @@ class SFrame(object):
         types = self.column_types()
         # A list of indexable column names
         names = self.column_names()
-
 
         # Constructing names of sframe columns that are of image type
         image_column_names = [names[i] for i in range(len(names)) if types[i] == graphlab.Image]
@@ -2231,7 +2761,7 @@ class SFrame(object):
                 raise ValueError("Invalid format: {}. Supported formats are 'csv' and 'binary'".format(format))
 
         ## Save the SFrame
-        url = make_internal_url(filename)
+        url = _make_internal_url(filename)
 
         with cython_context():
             if format is 'binary':
@@ -2701,7 +3231,7 @@ class SFrame(object):
                     tmpname = '__' + '-'.join(self.column_names())
                 try:
                     self.add_column(sa_value, tmpname)
-                except:
+                except Exception as e:
                     if (single_column):
                         self.add_column(saved_column, key)
                     raise

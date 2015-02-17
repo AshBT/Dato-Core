@@ -314,7 +314,7 @@ class table_printer {
     double time_ms = lowres_tt.ms();
     
     if(time_ms >= next_timed_print) {
-      std::lock_guard<mutex> pl_gaurd(print_lock);
+      std::lock_guard<mutex> pl_guard(print_lock);
 
       if(time_ms < next_timed_print)
         return;
@@ -360,7 +360,7 @@ class table_printer {
     size_t ticks_so_far = ++num_ticks_so_far;
     
     if(register_tick(tick, ticks_so_far)) {
-      std::lock_guard<mutex> pl_gaurd(print_lock);
+      std::lock_guard<mutex> pl_guard(print_lock);
       _print_progress_row(columns...); 
     }
     
@@ -369,6 +369,36 @@ class table_printer {
     }
   }
 
+  /** Print a row associated with the progress of an algorithm.
+   *
+   * The first argument is the tick, which can be something like
+   * samples processed or iterations.  The time at which to update
+   * this is automatically determined based on the first 2 (or more,
+   * if calls are extremely frequent) calls.
+   *
+   */
+  inline GL_HOT_INLINE void print_progress_row_strs(size_t tick, const std::vector<std::string>& _cols) {
+    ASSERT_EQ(_cols.size(), format.size());
+
+    auto cols = std::vector<flexible_type>();
+    for (const auto& c : _cols) {
+      cols.push_back(std::string(c));
+    }
+    
+    size_t ticks_so_far = ++num_ticks_so_far;
+    
+    if(register_tick(tick, ticks_so_far)) {
+      std::lock_guard<mutex> pl_gaurd(print_lock);
+      print_row(cols);
+    }
+    
+    if(((ticks_so_far - 1) % track_interval) == 0) {
+      track_progress_row(cols); 
+    }
+  }
+
+
+  
   /** Returns the elapsed time since class creation.  This is the
    * value used if progress_time() is passed in to print_row.
    */
@@ -598,7 +628,13 @@ private:
     }
 
     _register_values_in_row(track_row_buffer, 0, columns...);
+    track_progress_row(track_row_buffer);
+  }
 
+  inline GL_HOT_NOINLINE void 
+  track_progress_row(const std::vector<flexible_type>& track_row_buffer) {
+
+    size_t n = track_row_buffer.size();
     if(!tracker_is_initialized) {
       track_sframe = sframe();
 

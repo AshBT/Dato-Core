@@ -291,13 +291,13 @@ class sarray_format_reader_v2: public sarray_format_reader<T> {
   void release_cache(size_t block_number) {
     // if there is something to release
     if (m_cache[block_number].has_data) {
-      m_used_cache_entries.clear_bit(block_number);
-      m_cache_size.dec();
       m_buffer_pool.release_buffer(std::move(m_cache[block_number].buffer));
       m_cache[block_number].buffer.reset();
       m_cache[block_number].encoded_buffer.release();
       m_cache[block_number].encoded_buffer_reader.release();
       m_cache[block_number].has_data = false;
+      m_used_cache_entries.clear_bit(block_number);
+      m_cache_size.dec();
     }
   }
 
@@ -370,9 +370,8 @@ fetch_cache_from_file(size_t block_number, cache_entry& ret) {
   ret.encoded_buffer_reader = ret.encoded_buffer.get_range();
   ret.is_encoded = true;
   ret.has_data = true;
+  if (m_used_cache_entries.get(block_number) == false) m_cache_size.inc();
   m_used_cache_entries.set_bit(block_number);
-
-  m_cache_size.inc();
   // evict something random
   // we will only loop at most this number of times
   int num_to_evict = (int)(m_cache_size.value) - 
@@ -394,9 +393,8 @@ fetch_cache_from_file(size_t block_number, cache_entry& ret) {
     log_and_throw("Unexpected block read failure. Bad file?");
   }
   ret.buffer_start_row = m_start_row[block_number];
+  if (m_used_cache_entries.get(block_number) == false) m_cache_size.inc();
   m_used_cache_entries.set_bit(block_number);
-
-  m_cache_size.inc();
   // evict something random
   // we will only loop at most this number of times
   int num_to_evict = (int)(m_cache_size.value) - 

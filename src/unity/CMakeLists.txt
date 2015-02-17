@@ -2,7 +2,6 @@ project(unity)
 
 subdirs(
   python
-  python_deps
   lib
   toolkits
   server

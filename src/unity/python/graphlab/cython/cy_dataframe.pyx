@@ -5,6 +5,7 @@ from .cy_flexible_type cimport pylist_from_glvec
 from .cy_type_utils cimport pytype_from_dtype
 from .cy_type_utils cimport pytype_to_flex_type_enum, pytype_from_flex_type_enum
 from .cy_type_utils import infer_type_of_list
+from math import isnan
 
 HAS_PANDAS = False
 try:
@@ -27,11 +28,13 @@ cdef gl_dataframe gl_dataframe_from_pd(object df) except *:
         raise ValueError('Input pandas dataframe column names must be unique')
     for colname in df.columns.values:
         _type = pytype_from_dtype(df[colname].dtype) # convert from dtype to python type
+        # convert all NaNs to None
+        colcopy = [None if isinstance(x, float) and isnan(x) else x for x in df[colname].values]
         if _type is object:
-            _type = infer_type_of_list(df[colname].values)
+            _type = infer_type_of_list(colcopy)
         ret.names.push_back(str(colname))
         ret.types[str(colname)] = pytype_to_flex_type_enum(_type)
-        ret.values[str(colname)] = glvec_from_iterable(df[colname].values, _type)
+        ret.values[str(colname)] = glvec_from_iterable(colcopy, _type)
     return ret
 
 cdef pd_from_gl_dataframe(gl_dataframe& df):

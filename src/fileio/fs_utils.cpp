@@ -82,7 +82,7 @@ file_status get_file_status(const std::string& path) {
           graphlab::hdfs::get_hdfs() :
           graphlab::hdfs::get_hdfs(host, std::stoi(port));
       // fail we we are unable to construct the HDFS object
-      if (!hdfs.good()) return file_status::MISSING;
+      if (!hdfs.good()) return file_status::FS_UNAVAILABLE;
       // we are good. Use the HDFS accessors to figure out what to return
       if (!hdfs.path_exists(hdfspath)) return file_status::MISSING;
       else if (hdfs.is_directory(hdfspath)) return file_status::DIRECTORY;
@@ -446,6 +446,8 @@ std::vector<std::pair<std::string, file_status>> get_glob_files(const std::strin
   if (status == file_status::REGULAR_FILE) {
     // its a regular file. Ignore the glob and load it
     return {{url, file_status::REGULAR_FILE}};
+  } else if(status == file_status::FS_UNAVAILABLE) {
+    log_and_throw("Filesystem unavailable. Check server log for details.");
   }
   std::pair<std::string, std::string> path_elements = split_path_elements(trimmed_url, status);
   std::vector<std::pair<std::string, file_status>> files;

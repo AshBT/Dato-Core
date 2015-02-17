@@ -1600,6 +1600,8 @@ class gl_sarray {
  private:
   void instantiate_new();
 
+  void ensure_has_sarray_reader() const;
+
   std::shared_ptr<unity_sarray> m_sarray;
 
   mutable std::shared_ptr<sarray_reader<flexible_type> > m_sarray_reader;

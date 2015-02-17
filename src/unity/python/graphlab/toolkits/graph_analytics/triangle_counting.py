@@ -121,6 +121,13 @@ def create(graph, verbose=True):
 
     >>> tc_out = tc['triangle_count']  # SFrame
 
+    We can add the new "triangle_count" field to the original graph g using:
+
+    >>> g.vertices['triangle_count'] = tc['graph'].vertices['triangle_count']
+
+    Note that the task above does not require a join because the vertex
+    ordering is preserved through ``create()``.
+
     See Also
     --------
     TriangleCountingModel

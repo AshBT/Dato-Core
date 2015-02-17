@@ -1011,20 +1011,21 @@ bool sgraph::init_edge_field(const std::string& field, const flexible_type& init
   return true;
 }
 
-bool sgraph::select_vertex_fields(const std::set<std::string>& fields, size_t group) {
-  ASSERT_TRUE(fields.count(VID_COLUMN_NAME));
+bool sgraph::select_vertex_fields(const std::vector<std::string>& fields, size_t group) {
+  DASSERT_TRUE(std::set<std::string>(fields.begin(), fields.end()).count(VID_COLUMN_NAME));
   auto& sframe_vec = vertex_group(group);
   for (auto& sf: sframe_vec) {
-    sf = sf.select_columns(std::vector<std::string>(fields.begin(), fields.end()));
+    sf = sf.select_columns(fields);
   }
   return true;
 }
 
-bool sgraph::select_edge_fields(const std::set<std::string>& fields, size_t groupa, size_t groupb) {
-  ASSERT_TRUE(fields.count(SRC_COLUMN_NAME) && fields.count(DST_COLUMN_NAME));
+bool sgraph::select_edge_fields(const std::vector<std::string>& fields, size_t groupa, size_t groupb) {
+  DASSERT_TRUE(std::set<std::string>(fields.begin(), fields.end()).count(SRC_COLUMN_NAME));
+  DASSERT_TRUE(std::set<std::string>(fields.begin(), fields.end()).count(DST_COLUMN_NAME));
   auto& sframe_vec = edge_group(groupa, groupb);
   for (auto& sf: sframe_vec) {
-    sf = sf.select_columns(std::vector<std::string>(fields.begin(), fields.end()));
+    sf = sf.select_columns(fields);
   }
   return true;
 }

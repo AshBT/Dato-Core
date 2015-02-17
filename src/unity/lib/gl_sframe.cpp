@@ -15,9 +15,11 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <ctime>
+#include <mutex>
 #include <deque>
 #include <iomanip>
 #include <boost/algorithm/string.hpp>
+#include <parallel/pthread_tools.hpp>
 #include <unity/lib/gl_sarray.hpp>
 #include <unity/lib/gl_sframe.hpp>
 #include <unity/lib/unity_sframe.hpp>
@@ -28,6 +30,8 @@
 #include <table_printer/table_printer.hpp>
 
 namespace graphlab {
+
+static graphlab::mutex reader_shared_ptr_lock;
 /**
  * Constructs a dataframe from data represented a collection of 
  * columns of flexible_type.
@@ -227,9 +231,7 @@ std::vector<flexible_type> gl_sframe::operator[](int i) {
   if (i < 0 || (size_t)i >= size()) {
     throw std::string("Index out of range");
   }
-  if (!m_sframe_reader) {
-    m_sframe_reader= std::move(get_proxy()->get_underlying_sframe()->get_reader());
-  }
+  ensure_has_sframe_reader();
   std::vector<std::vector<flexible_type> > rows(1);
   size_t rows_read  = m_sframe_reader->read_rows(i, i + 1, rows);
   ASSERT_TRUE(rows.size() > 0);
@@ -241,9 +243,7 @@ std::vector<flexible_type> gl_sframe::operator[](int i) const {
   if (i < 0 || (size_t)i >= size()) {
     throw std::string("Index out of range");
   }
-  if (!m_sframe_reader) {
-    m_sframe_reader= std::move(get_proxy()->get_underlying_sframe()->get_reader());
-  }
+  ensure_has_sframe_reader();
   std::vector<std::vector<flexible_type> > rows(1);
   size_t rows_read  = m_sframe_reader->read_rows(i, i + 1, rows);
   ASSERT_TRUE(rows.size() > 0);
@@ -333,10 +333,7 @@ gl_sframe_range gl_sframe::range_iterator(size_t start, size_t end) const {
         (start == 0 && end == 0))) {
     throw std::string("Index out of range");
   }
-
-  if (!m_sframe_reader) {
-    m_sframe_reader = std::move(get_proxy()->get_underlying_sframe()->get_reader());
-  }
+  ensure_has_sframe_reader();
   return gl_sframe_range(m_sframe_reader, start, end);
 }
 
@@ -404,6 +401,16 @@ size_t gl_sframe::num_columns() const {
 
 void gl_sframe::instantiate_new() {
   m_sframe = std::make_shared<unity_sframe>();
+}
+
+void gl_sframe::ensure_has_sframe_reader() const {
+  if (!m_sframe_reader) {
+    std::lock_guard<mutex> guard(reader_shared_ptr_lock);
+    if (!m_sframe_reader) {
+      m_sframe_reader =
+          std::move(get_proxy()->get_underlying_sframe()->get_reader());
+    }
+  }
 }
 
 std::vector<std::string> gl_sframe::column_names() const {

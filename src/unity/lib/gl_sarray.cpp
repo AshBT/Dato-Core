@@ -15,6 +15,8 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <ctime>
+#include <mutex>
+#include <parallel/pthread_tools.hpp>
 #include <unity/lib/gl_sarray.hpp>
 #include <unity/lib/gl_sframe.hpp>
 #include <unity/lib/unity_sarray.hpp>
@@ -25,6 +27,7 @@
 
 namespace graphlab {
 
+static graphlab::mutex reader_shared_ptr_lock;
 
 /**
  * Given an array of flexible_type of mixed type, find the common base type
@@ -206,9 +209,7 @@ flexible_type gl_sarray::operator[](int i) const {
   if (i < 0 || (size_t)i >= get_proxy()->size()) {
     throw std::string("Index out of range");
   }
-  if (!m_sarray_reader) {
-    m_sarray_reader = std::move(get_proxy()->get_underlying_sarray()->get_reader());
-  }
+  ensure_has_sarray_reader();
   std::vector<flexible_type> rows(1);
   size_t rows_read  = m_sarray_reader->read_rows(i, i + 1, rows);
   ASSERT_TRUE(rows.size() > 0);
@@ -254,10 +255,7 @@ gl_sarray_range gl_sarray::range_iterator(size_t start, size_t end) const {
         (start == 0 && end == 0))) {
     throw std::string("Index out of range");
   }
-
-  if (!m_sarray_reader) {
-    m_sarray_reader = std::move(get_proxy()->get_underlying_sarray()->get_reader());
-  }
+  ensure_has_sarray_reader();
   return gl_sarray_range(m_sarray_reader, start, end);
 }
 
@@ -581,6 +579,16 @@ std::ostream& operator<<(std::ostream& out, const gl_sarray& other) {
 
 void gl_sarray::instantiate_new() {
   m_sarray = std::make_shared<unity_sarray>();
+}
+
+void gl_sarray::ensure_has_sarray_reader() const {
+  if (!m_sarray_reader) {
+    std::lock_guard<mutex> guard(reader_shared_ptr_lock);
+    if (!m_sarray_reader) {
+      m_sarray_reader = 
+          std::move(get_proxy()->get_underlying_sarray()->get_reader());
+    }
+  }
 }
 /**************************************************************************/
 /*                                                                        */
