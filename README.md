@@ -101,27 +101,42 @@ Compiling
 
     ./configure
 
-Running configure will create two sub-directories, release/ and debug/ . cd
-into src/unity/ under either of these directories and running make will build
-the release or the debug versions respectively. 
+Running configure will create two sub-directories, *release* and *debug*.  Select 
+either of these modes/directories and navigate to the *src/unity* subdirectory:
+
+    cd debug/src/unity
+   
+   or
+   
+    cd release/src/unity
+
+Running **make** will build the project, according to the mode selected. 
 
 We recommend using make's parallel build feature to accelerate the compilation
 process. For instance:
 
     make -j 4
 
-will perform up to 4 build tasks in parallel. When building in release/ mode,
+will perform up to 4 build tasks in parallel. When building in *release* mode/directory,
 GraphLab Create does require a large amount of memory to compile with the
-heaviest toolkit requiring 1GB of RAM. Where K is the amount of memory you
-have on your machine in GB, we recommend not exceeding make -j K
+heaviest toolkit requiring 1GB of RAM. Where **K** is the amount of memory you
+have on your machine in GB, we recommend not exceeding **make -j K**
 
-To generate the python, cd one directory further into the python directory and
-run make again.
+To generate the python, navigate to the *python* subdirectory:
+
+    cd python
+
+and run **make** again.
+
+    make
 
 To use your dev build export these environment variables:
-export PYTHONPATH="<repo root>/debug/src/unity/python/"
-export GRAPHLAB_UNITY="<repo root>/debug/src/unity/server/unity_server"
-where <repo root> is replace with the absolute path to the root of your repository.
+  
+    export PYTHONPATH="<repo root>/debug/src/unity/python/"
+   
+    export GRAPHLAB_UNITY="<repo root>/debug/src/unity/server/unity_server"
+ 
+ where <*repo root*> is replaced with the absolute path to the root of your repository.
 
 Running Unit Tests
 ------------------
