@@ -132,11 +132,18 @@ and run **make** again.
 
 To use your dev build export these environment variables:
   
-    export PYTHONPATH="<repo root>/debug/src/unity/python/"
-   
     export GRAPHLAB_UNITY="<repo root>/debug/src/unity/server/unity_server"
  
- where <*repo root*> is replaced with the absolute path to the root of your repository.
+ where <*repo root*> is replaced with the absolute path to the root of your repository. Then run pip install to pull in dependencies and set the python path.
+
+    # recommended -- use a virtual environment
+    virtualenv venv
+    . venv/bin/activate
+
+    # required -- pip install the built Python package with -e
+    pip install -e .
+
+The built Python package is now available for use in the current Python environment. As you make changes and run `make` again, the package will update in place (no need to re-create the virtualenv or pip install again).
 
 Running Unit Tests
 ------------------
