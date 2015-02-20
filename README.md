@@ -28,7 +28,8 @@ Included within the release are also a large number of utility code such as:
 
 License
 -------
-GNU Affero General Public License. See [license](LICENSE).
+The python client code is licensed under a BSD license. See [DATO-PYTHON-LICENSE](DATO-PYTHON-LICENSE) file.
+The rest of the code is licensed under a GNU Affero General Public License. See [license](LICENSE) file.
 
 Open Source Commitment
 ----------------------
