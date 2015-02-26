@@ -18,7 +18,7 @@ import graphlab.connect.main as glconnect
 from graphlab.cython.cy_type_utils import infer_type_of_list
 from graphlab.cython.context import debug_trace as cython_context
 from graphlab.cython.cy_sframe import UnitySFrameProxy
-from graphlab.util import _check_canvas_enabled, _make_internal_url
+from graphlab.util import _check_canvas_enabled, _make_internal_url, _is_callable
 from graphlab.data_structures.sarray import SArray, _create_sequential_sarray
 import graphlab.aggregate
 import graphlab
@@ -2424,7 +2424,7 @@ class SFrame(object):
         Rows: 3
         [2.0,2.0,2.0]
         """
-        assert inspect.isfunction(fn), "Input must be a function"
+        assert _is_callable(fn), "Input must be a function"
         test_sf = self[:10]
         dryrun = [fn(row) for row in test_sf]
         if dtype is None:

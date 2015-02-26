@@ -30,6 +30,7 @@ import array
 import math
 import random
 import shutil
+import functools
 HAS_PYSPARK = True
 try:
     from pyspark import SparkContext, SQLContext
@@ -2661,6 +2662,29 @@ class SFrameTest(unittest.TestCase):
         self.assertEquals(list(sa), [None] * 100)
         self.assertEqual(sa.dtype(), float)
 
+    def test_apply_with_partial(self):
+        sf = SFrame({'a': [1, 2, 3, 4, 5]})
+
+        def concat_fn(character, row):
+            return '%s%d' % (character, row['a'])
+
+        my_partial_fn = functools.partial(concat_fn, 'x')
+        sa = sf.apply(my_partial_fn)
+        self.assertEqual(list(sa), ['x1', 'x2', 'x3', 'x4', 'x5'])
+
+    def test_apply_with_functor(self):
+        sf = SFrame({'a': [1, 2, 3, 4, 5]})
+
+        class Concatenator(object):
+            def __init__(self, character):
+                self.character = character
+
+            def __call__(self, row):
+                return '%s%d' % (self.character, row['a'])
+
+        concatenator = Concatenator('x')
+        sa = sf.apply(concatenator)
+        self.assertEqual(list(sa), ['x1', 'x2', 'x3', 'x4', 'x5'])
 
 if __name__ == "__main__":
 

@@ -1033,3 +1033,6 @@ def _assert_sframe_equal(sf1,
           raise AssertionError("Columns " + str(i) + " types mismatched.")
         if not (sf1[i[0]] == sf2[i[1]]).all():
             raise AssertionError("Columns " + str(i) + " are not equal!")
+
+def _is_callable(obj):
+    return hasattr(obj, "__call__")

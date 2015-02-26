@@ -130,9 +130,11 @@ class LocalServer(GraphLabServer):
         _get_metric_tracker().track('engine-started', value=1, properties=properties, send_sys_info=True)
         _get_metric_tracker().track('engine-started-local', value=1)
 
-        product_key_arg = "--product_key=%s" % self.product_key
+        arglist = [self.server_bin, self.server_addr]
 
-        arglist = [self.server_bin, self.server_addr, product_key_arg]
+        if self.product_key:
+            arglist.append("--product_key=%s" % self.product_key)
+
         if (self.auth_token):
             arglist.append("--auth_token=%s" % self.auth_token)
 

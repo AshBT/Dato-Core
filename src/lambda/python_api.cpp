@@ -38,12 +38,21 @@ void set_gl_sys_path() {
     python::object os_environ = python::import("os").attr("environ");
     python::object sys_path_str = os_environ.attr("get")("__GL_SYS_PATH__");
 
-    // Simply doing "sys_path = sys_path_str.attr("split")(":");"
-    // does not work as expected.
-    // Have to manually clear the list and append with __GL_SYS_PATH__.
-    while(len(sys_path))
-      sys_path.attr("pop")();
-    sys_path.attr("extend")(sys_path_str.attr("split")(":"));
+    // If the __GL_SYS_PATH__ isn't present, then just keep the
+    // regular sys.path.
+    
+    if(sys_path_str != python::object() ) {  
+      // Simply doing "sys_path = sys_path_str.attr("split")(":");"
+      // does not work as expected.
+      // Have to manually clear the list and append with __GL_SYS_PATH__.
+      while(len(sys_path))
+        sys_path.attr("pop")();
+      sys_path.attr("extend")(sys_path_str.attr("split")(":"));
+    }
+  } catch (python::error_already_set const& e) {
+      std::string error_string = parse_python_error();
+      std::cerr << error_string << std::endl;
+      throw(error_string);
   } catch (...) {
     std::cerr << "Warning: Error setting sys.path from __GL_SYS_PATH__" << std::endl;
   }

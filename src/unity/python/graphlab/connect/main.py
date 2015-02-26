@@ -91,7 +91,7 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
     # product key check. This may fail if there are issues running
     # the unity_server binary
     try:
-      product_key_good = graphlab.product_key.is_product_key_valid(product_key)
+        product_key_good = graphlab.product_key.is_product_key_valid(product_key)
     except RuntimeError as r:
         __LOGGER__.error("Fatal error. The unity_server process cannot be started. There may have been an "
                        "issue during installation of graphlab-create. Please uninstall graphlab-create "
@@ -102,9 +102,16 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
 
     # verify product key is good
     if (not product_key_good):
-        __LOGGER__.error("Product Key validation failed, please confirm your product key is correct. "
-                         "If you believe this key to be valid, please contact support@dato.com")
-        _get_metric_tracker().track('server_launch.product_key_invalid')
+        if product_key is None:
+            __LOGGER__.error("No product key found. Please configure your product key by setting the [%s] section with"
+            " '%s' key in %s or by setting the environment variable GRAPHLAB_PRODUCT_KEY to the product key."
+            " If you do not have a product key, please register for one at https://dato.com/register."  % (
+                    graphlab.product_key.__section, graphlab.product_key.__key, graphlab.product_key.__default_config_path))
+            _get_metric_tracker().track('server_launch.product_key_missing')
+        else:
+            __LOGGER__.error("Product Key validation failed, please confirm your product key is correct. "
+                             "If you believe this key to be valid, please contact support@dato.com")
+            _get_metric_tracker().track('server_launch.product_key_invalid')
         return
 
     # construct a server server instance based on the server_type
