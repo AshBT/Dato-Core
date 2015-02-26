@@ -411,6 +411,7 @@ echo -e "\t CMAKE=$CMAKE" >> configure.deps
 
 
 mkdir -p deps/local/lib
+mkdir doc
 
 echo "======================= BUILD CONFIGURATION ========================"
 echo "System Information: " | tee -a $LOG_FILE

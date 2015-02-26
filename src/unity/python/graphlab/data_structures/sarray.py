@@ -19,7 +19,7 @@ import graphlab.connect.main as glconnect
 from graphlab.cython.cy_type_utils import pytype_from_dtype, infer_type_of_list, is_numeric_type
 from graphlab.cython.cy_sarray import UnitySArrayProxy
 from graphlab.cython.context import debug_trace as cython_context
-from graphlab.util import _make_internal_url
+from graphlab.util import _make_internal_url, _is_callable
 import graphlab as gl
 import inspect
 import math
@@ -1335,7 +1335,7 @@ class SArray(object):
             if dtype == None:
                 raise TypeError("dtype must be specified for a lua function")
         else:
-            assert inspect.isfunction(fn), "Input must be a function"
+            assert _is_callable(fn), "Input must be a function"
 
             dryrun = [fn(i) for i in self.head(100) if i is not None]
             import traceback

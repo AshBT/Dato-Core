@@ -16,8 +16,9 @@ __LOGGER__ = logging.getLogger(__name__)
 
 __section = 'Product'
 __key = 'product_key'
+__default_config_path = os.path.join(os.path.expanduser("~"), ".graphlab", "config")
 
-def get_product_key(file=(os.path.join(os.path.expanduser("~"), ".graphlab", "config"))):
+def get_product_key(file = __default_config_path):
     """
     Returns the product key found in file, which by default is ~/.graphlab/config
     or in environment variable GRAPHLAB_PRODUCT_KEY.
@@ -26,7 +27,6 @@ def get_product_key(file=(os.path.join(os.path.expanduser("~"), ".graphlab", "co
 
     @param file optional parameter to specify which file to use for configuration (defaults to ~/.graphlab/config)
     @return Product key string, or None if not found.
-    @throws KeyError('Missing Product Key')
     """
     PRODUCT_KEY_ENV = 'GRAPHLAB_PRODUCT_KEY'
     if not PRODUCT_KEY_ENV in os.environ:
@@ -49,9 +49,7 @@ def get_product_key(file=(os.path.join(os.path.expanduser("~"), ".graphlab", "co
                 _mt._get_metric_tracker().track('server_launch.config_parser_error')
                 raise KeyError(msg)
         else:
-            msg = "No product key found. Please configure your product key by setting the [%s] section with '%s' key in %s or by setting the environment variable GRAPHLAB_PRODUCT_KEY to the product key. If you do not have a product key, please register for one at https://dato.com/register." % (__section, __key, config_file)
-            _mt._get_metric_tracker().track('server_launch.product_key_missing')
-            raise KeyError(msg)
+            return None
     return os.environ[PRODUCT_KEY_ENV]
 
 def set_product_key(product_key, file=(os.path.join(os.path.expanduser("~"), ".graphlab", "config"))):
@@ -101,7 +99,9 @@ def is_product_key_valid(product_key, config=DEFAULT_CONFIG):
         raise RuntimeError("Cannot execute unity_server binary")
 
     try:
-        cmd = "%s --check_product_key_only --product_key='%s'" % (config.server_bin, product_key)
+        cmd = "%s --check_product_key_only" % config.server_bin
+        if product_key:
+            cmd +=  " --product_key='%s'" % product_key
         subprocess.check_output(cmd, env=_sys_util.make_unity_server_env(), shell=True)
         return True
     except Exception as e:
