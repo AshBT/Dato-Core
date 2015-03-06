@@ -89,9 +89,6 @@ For Ubuntu versions prior to 12.10, you will need to install a newer version of 
     sudo add-apt-repository ppa:ubuntu-toolchain-r/test
     sudo apt-get update
     sudo apt-get install gcc-4.8 g++-4.8 build-essential libopenmpi-dev default-jdk cmake zlib1g-dev
-    #redirect gcc to point to gcc-4.8
-    sudo rm /usr/bin/gcc
-    sudo ln -s /usr/bin/gcc-4.8 /usr/bin/gcc
     #redirect g++ to point to g++-4.8
     sudo rm /usr/bin/g++
     sudo ln -s /usr/bin/g++-4.8 /usr/bin/g++
