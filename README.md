@@ -74,15 +74,18 @@ There are however, a few dependencies which we cannot easily satisfy:
 
 ### Satisfying Dependencies on Mac OS X
 
-Install XCode 6 with the command line tools.
-
+Install XCode 6 with the command line tools. Then:
+    brew install automake
+    brew install autoconf
 
 ### Satisfying Dependencies on Ubuntu
 
 In Ubuntu >= 12.10, you can satisfy the dependencies with:
 All the dependencies can be satisfied from the repository:
 
-    sudo apt-get install gcc g++ build-essential libopenmpi-dev default-jdk cmake zlib1g-dev 
+    sudo apt-get install gcc g++ build-essential libopenmpi-dev default-jdk cmake zlib1g-dev \
+        libatlas-base-dev automake autoconf python-dev
+    sudo pip install cython
 
 For Ubuntu versions prior to 12.10, you will need to install a newer version of gcc
 
