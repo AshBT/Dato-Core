@@ -77,6 +77,7 @@ There are however, a few dependencies which we cannot easily satisfy:
 Install XCode 6 with the command line tools. Then:
     brew install automake
     brew install autoconf
+    brew install cmake
 
 ### Satisfying Dependencies on Ubuntu
 
@@ -105,11 +106,11 @@ Compiling
 Running configure will create two sub-directories, *release* and *debug*.  Select 
 either of these modes/directories and navigate to the *src/unity* subdirectory:
 
-    cd debug/src/unity
+    cd <repo root>/debug/src/unity
    
    or
    
-    cd release/src/unity
+    cd <repo root>/release/src/unity
 
 Running **make** will build the project, according to the mode selected. 
 
@@ -123,19 +124,25 @@ GraphLab Create does require a large amount of memory to compile with the
 heaviest toolkit requiring 1GB of RAM. Where **K** is the amount of memory you
 have on your machine in GB, we recommend not exceeding **make -j K**
 
-To generate the python, navigate to the *python* subdirectory:
+To generate the python code bindings,
 
-    cd python
+Navigate to the *python* subdirectories and run **make** to generate Python code bindings. Remember to replace <*repo root*> with the absolute path to the root of your repository.
 
-and run **make** again.
 
+    cd <repo root>/debug/src/unity/python
     make
+    
+    or
+
+    cd <repo root>/release/src/unity/python
+    make
+
 
 To use your dev build export these environment variables:
   
     export GRAPHLAB_UNITY="<repo root>/debug/src/unity/server/unity_server"
  
- where <*repo root*> is replaced with the absolute path to the root of your repository. Then run pip install to pull in dependencies and set the python path.
+Then run pip install to pull in dependencies and set the python path.
 
     # recommended -- use a virtual environment
     virtualenv venv
@@ -152,14 +159,14 @@ Running Unit Tests
 ### Running Python unit tests
 From the repo root:
 
-    cd debug/src/unity/python/graphlab/test
+    cd <repo root>/debug/src/unity/python/graphlab/test
     nosetests
 
 
 ### Running C++ units
 From the repo root:
 
-    cd debug/test
+    cd <repo root>/debug/test
     make
     ctest
 
