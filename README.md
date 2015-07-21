@@ -1,6 +1,10 @@
+Announcement
+============
+Per the announcement at Data Science Summit, the license will be changing to BSD! Between that and other changes, there will be major restructuring of this repository in the near future. The target date for the re-release is mid to end August. If you plan to fork and modify the code, be aware that you may need to port your changes forward soon.
+
+
 Dato Core
 =========
-
 Introduction
 ------------
 Dato Core is the open source piece of GraphLab Create, a Python-based machine
