@@ -1,8 +1,9 @@
 Announcement
 ============
-Per the announcement at Data Science Summit, the license will be changing to BSD! Between that and other changes, there will be major restructuring of this repository in the near future. The target date for the re-release is mid to end August. If you plan to fork and modify the code, be aware that you may need to port your changes forward soon.
+An updated version of this repository has been released under the BSD license: https://github.com/dato-code/SFrame
 
-In the meantime to try out SFrame/SGraph, download and install our graphlab-create python package.
+Please use that repository. **This repository is deprecated.** It will no longer be updated.
+
 
 
 Dato Core
