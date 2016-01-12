@@ -264,7 +264,7 @@ def perform_version_check(configfile=(_os.path.join(_os.path.expanduser("~"), ".
         try:
             latest_version = get_newest_version(timeout=1,
                                                 _url=_version_url).strip()
-            if _parse_version(latest_version) > _parse_version(_version_info.version):
+            if _parse_version(latest_version) > _parse_version(_version_info.version).replace(".gpu",""):
                 try:
                     _feature_url += '/' + get_major_version(_version_info.version)
                     latest_features = get_newest_features(timeout=1,
