@@ -1,22 +1,14 @@
-'''
-Copyright (C) 2015 Dato, Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
 """
 This module contains the main logic for start, query, stop graphlab server client connection.
 """
+
+'''
+Copyright (C) 2015 Dato, Inc.
+All rights reserved.
+
+This software may be modified and distributed under the terms
+of the BSD license. See the DATO-PYTHON-LICENSE file for details.
+'''
 
 from graphlab.cython.cy_unity import UnityGlobalProxy
 from graphlab.cython.cy_ipc import PyCommClient as Client
@@ -99,7 +91,7 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
     # product key check. This may fail if there are issues running
     # the unity_server binary
     try:
-      product_key_good = graphlab.product_key.is_product_key_valid(product_key)
+        product_key_good = graphlab.product_key.is_product_key_valid(product_key)
     except RuntimeError as r:
         __LOGGER__.error("Fatal error. The unity_server process cannot be started. There may have been an "
                        "issue during installation of graphlab-create. Please uninstall graphlab-create "
@@ -110,9 +102,16 @@ def launch(server_addr=None, server_bin=None, server_log=None, auth_token=None,
 
     # verify product key is good
     if (not product_key_good):
-        __LOGGER__.error("Product Key validation failed, please confirm your product key is correct. "
-                         "If you believe this key to be valid, please contact support@dato.com")
-        _get_metric_tracker().track('server_launch.product_key_invalid')
+        if product_key is None:
+            __LOGGER__.error("No product key found. Please configure your product key by setting the [%s] section with"
+            " '%s' key in %s or by setting the environment variable GRAPHLAB_PRODUCT_KEY to the product key."
+            " If you do not have a product key, please register for one at https://dato.com/register."  % (
+                    graphlab.product_key.__section, graphlab.product_key.__key, graphlab.product_key.__default_config_path))
+            _get_metric_tracker().track('server_launch.product_key_missing')
+        else:
+            __LOGGER__.error("Product Key validation failed, please confirm your product key is correct. "
+                             "If you believe this key to be valid, please contact support@dato.com")
+            _get_metric_tracker().track('server_launch.product_key_invalid')
         return
 
     # construct a server server instance based on the server_type

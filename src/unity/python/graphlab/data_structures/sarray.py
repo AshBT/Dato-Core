@@ -8,19 +8,10 @@ The data is immutable, homogeneous, and is stored on the GraphLab Server side.
 
 '''
 Copyright (C) 2015 Dato, Inc.
+All rights reserved.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This software may be modified and distributed under the terms
+of the BSD license. See the DATO-PYTHON-LICENSE file for details.
 '''
 
 import graphlab.connect as _mt
@@ -28,7 +19,7 @@ import graphlab.connect.main as glconnect
 from graphlab.cython.cy_type_utils import pytype_from_dtype, infer_type_of_list, is_numeric_type
 from graphlab.cython.cy_sarray import UnitySArrayProxy
 from graphlab.cython.context import debug_trace as cython_context
-from graphlab.util import _make_internal_url
+from graphlab.util import _make_internal_url, _is_callable
 import graphlab as gl
 import inspect
 import math
@@ -1344,7 +1335,7 @@ class SArray(object):
             if dtype == None:
                 raise TypeError("dtype must be specified for a lua function")
         else:
-            assert inspect.isfunction(fn), "Input must be a function"
+            assert _is_callable(fn), "Input must be a function"
 
             dryrun = [fn(i) for i in self.head(100) if i is not None]
             import traceback

@@ -1,22 +1,15 @@
-'''
-Copyright (C) 2015 Dato, Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
 """
 This module defines top level utility functions for GraphLab Create.
 """
+
+'''
+Copyright (C) 2015 Dato, Inc.
+All rights reserved.
+
+This software may be modified and distributed under the terms
+of the BSD license. See the DATO-PYTHON-LICENSE file for details.
+'''
+
 import urllib as _urllib
 import urllib2 as _urllib2
 import sys as _sys
@@ -271,7 +264,7 @@ def perform_version_check(configfile=(_os.path.join(_os.path.expanduser("~"), ".
         try:
             latest_version = get_newest_version(timeout=1,
                                                 _url=_version_url).strip()
-            if _parse_version(latest_version) > _parse_version(_version_info.version):
+            if _parse_version(latest_version) > _parse_version(_version_info.version).replace(".gpu",""):
                 try:
                     _feature_url += '/' + get_major_version(_version_info.version)
                     latest_features = get_newest_features(timeout=1,
@@ -1040,3 +1033,6 @@ def _assert_sframe_equal(sf1,
           raise AssertionError("Columns " + str(i) + " types mismatched.")
         if not (sf1[i[0]] == sf2[i[1]]).all():
             raise AssertionError("Columns " + str(i) + " are not equal!")
+
+def _is_callable(obj):
+    return hasattr(obj, "__call__")

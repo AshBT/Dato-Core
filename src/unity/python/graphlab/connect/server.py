@@ -1,23 +1,15 @@
-'''
-Copyright (C) 2015 Dato, Inc.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
 """
 This module contains the interface for graphlab server, and the
 implementation of a local graphlab server.
 """
+
+'''
+Copyright (C) 2015 Dato, Inc.
+All rights reserved.
+
+This software may be modified and distributed under the terms
+of the BSD license. See the DATO-PYTHON-LICENSE file for details.
+'''
 
 from graphlab.cython.cy_ipc import PyCommClient as Client
 from graphlab.cython.cy_ipc import get_public_secret_key_pair
@@ -138,9 +130,11 @@ class LocalServer(GraphLabServer):
         _get_metric_tracker().track('engine-started', value=1, properties=properties, send_sys_info=True)
         _get_metric_tracker().track('engine-started-local', value=1)
 
-        product_key_arg = "--product_key=%s" % self.product_key
+        arglist = [self.server_bin, self.server_addr]
 
-        arglist = [self.server_bin, self.server_addr, product_key_arg]
+        if self.product_key:
+            arglist.append("--product_key=%s" % self.product_key)
+
         if (self.auth_token):
             arglist.append("--auth_token=%s" % self.auth_token)
 

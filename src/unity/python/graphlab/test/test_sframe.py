@@ -1,18 +1,9 @@
 '''
 Copyright (C) 2015 Dato, Inc.
+All rights reserved.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This software may be modified and distributed under the terms
+of the BSD license. See the DATO-PYTHON-LICENSE file for details.
 '''
 # from nose import with_setup
 import graphlab as gl
@@ -39,6 +30,7 @@ import array
 import math
 import random
 import shutil
+import functools
 HAS_PYSPARK = True
 try:
     from pyspark import SparkContext, SQLContext
@@ -2670,6 +2662,29 @@ class SFrameTest(unittest.TestCase):
         self.assertEquals(list(sa), [None] * 100)
         self.assertEqual(sa.dtype(), float)
 
+    def test_apply_with_partial(self):
+        sf = SFrame({'a': [1, 2, 3, 4, 5]})
+
+        def concat_fn(character, row):
+            return '%s%d' % (character, row['a'])
+
+        my_partial_fn = functools.partial(concat_fn, 'x')
+        sa = sf.apply(my_partial_fn)
+        self.assertEqual(list(sa), ['x1', 'x2', 'x3', 'x4', 'x5'])
+
+    def test_apply_with_functor(self):
+        sf = SFrame({'a': [1, 2, 3, 4, 5]})
+
+        class Concatenator(object):
+            def __init__(self, character):
+                self.character = character
+
+            def __call__(self, row):
+                return '%s%d' % (self.character, row['a'])
+
+        concatenator = Concatenator('x')
+        sa = sf.apply(concatenator)
+        self.assertEqual(list(sa), ['x1', 'x2', 'x3', 'x4', 'x5'])
 
 if __name__ == "__main__":
 

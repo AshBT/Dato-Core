@@ -1,19 +1,10 @@
 # -*- coding: utf-8 -*-
 '''
 Copyright (C) 2015 Dato, Inc.
+All rights reserved.
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as
-published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+This software may be modified and distributed under the terms
+of the BSD license. See the DATO-PYTHON-LICENSE file for details.
 '''
 from graphlab.data_structures.sarray import SArray
 from graphlab_util.timezone import GMT
@@ -31,6 +22,7 @@ import util
 import time
 import itertools
 import warnings
+import functools
 
 #######################################################
 # Metrics tracking tests are in test_usage_metrics.py #
@@ -1458,3 +1450,27 @@ class SArrayTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             sa.str_to_datetime('%m/%d/%Y %L:%M')
+
+    def test_apply_with_partial(self):
+        sa = SArray([1, 2, 3, 4, 5])
+
+        def concat_fn(character, number):
+            return '%s%d' % (character, number)
+
+        my_partial_fn = functools.partial(concat_fn, 'x')
+        sa_transformed = sa.apply(my_partial_fn)
+        self.assertEqual(list(sa_transformed), ['x1', 'x2', 'x3', 'x4', 'x5'])
+
+    def test_apply_with_functor(self):
+        sa = SArray([1, 2, 3, 4, 5])
+
+        class Concatenator(object):
+            def __init__(self, character):
+                self.character = character
+
+            def __call__(self, number):
+                return '%s%d' % (self.character, number)
+
+        concatenator = Concatenator('x')
+        sa_transformed = sa.apply(concatenator)
+        self.assertEqual(list(sa_transformed), ['x1', 'x2', 'x3', 'x4', 'x5'])
